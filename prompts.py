@@ -46,7 +46,7 @@ TERMINOLOGY CONSISTENCY (Korean):
 PERSON NAMES - DO NOT TRANSLATE:
 - Keep ALL person names in original English
 - Do NOT translate names to Korean phonetic equivalents
-- Names should remain exactly as: "Ishan Singh", "Yanyan Zhang", etc."""
+- Names should remain exactly as: "Daekeun Kim", "Gil-dong Hong", etc."""
     
     @classmethod
     def create_batch_prompt(cls, target_language: str, enable_polishing: bool = True) -> str:
