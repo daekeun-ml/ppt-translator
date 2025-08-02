@@ -5,7 +5,7 @@ Amazon Bedrock 모델을 활용하여 고품질 번역을 제공하는 강력한
 ## 기능
 
 - **PowerPoint 번역**: PowerPoint 프레젠테이션의 텍스트 콘텐츠 번역
-- **AWS Bedrock 통합**: 고품질 번역을 위한 AWS Bedrock 모델 사용
+- **Amazon Bedrock 통합**: 고품질 번역을 위한 Amazon Bedrock 모델 사용
 - **서식 보존**: 원본 서식, 레이아웃 및 스타일 유지
 - **독립형 및 MCP 지원**: 명령줄 도구로 사용하거나 FastMCP를 통해 AI 어시스턴트와 통합
 - **다국어 지원**: 다양한 언어 간 번역 지원
@@ -287,7 +287,7 @@ FastMCP 서버는 다음 도구를 제공합니다:
     - `input_file`: 입력 PowerPoint 파일 경로 (.pptx)
     - `target_language`: 대상 언어 코드 (기본값: 'ko')
     - `output_file`: 번역된 출력 파일 경로 (선택사항, 자동 생성)
-    - `model_id`: AWS Bedrock 모델 ID (기본값: Claude 3.7 Sonnet)
+    - `model_id`: Amazon Bedrock 모델 ID (기본값: Claude 3.7 Sonnet)
     - `enable_polishing`: 자연어 다듬기 활성화 (기본값: true)
 
 - **`translate_specific_slides`**: PowerPoint 프레젠테이션의 특정 슬라이드만 번역
@@ -296,7 +296,7 @@ FastMCP 서버는 다음 도구를 제공합니다:
     - `slide_numbers`: 번역할 슬라이드 번호 (쉼표로 구분, 예: "1,3,5" 또는 "2-4,7")
     - `target_language`: 대상 언어 코드 (기본값: 'ko')
     - `output_file`: 번역된 출력 파일 경로 (선택사항, 자동 생성)
-    - `model_id`: AWS Bedrock 모델 ID (기본값: Claude 3.7 Sonnet)
+    - `model_id`: Amazon Bedrock 모델 ID (기본값: Claude 3.7 Sonnet)
     - `enable_polishing`: 자연어 다듬기 활성화 (기본값: true)
 
 - **`get_slide_info`**: PowerPoint 프레젠테이션의 슬라이드 정보 확인
@@ -311,7 +311,7 @@ FastMCP 서버는 다음 도구를 제공합니다:
 
 - **`list_supported_languages`**: 번역 지원 대상 언어 목록 확인
 
-- **`list_supported_models`**: 지원되는 AWS Bedrock 모델 목록 확인
+- **`list_supported_models`**: 지원되는 Amazon Bedrock 모델 목록 확인
 
 - **`get_translation_help`**: 번역기 사용에 대한 도움말 정보 확인
 
@@ -392,7 +392,7 @@ ppt-translator/
 ├── fastmcp_server.py      # FastMCP 서버 구현
 ├── ppt_handler.py         # PowerPoint 처리 로직
 ├── translation_engine.py  # 번역 서비스
-├── bedrock_client.py      # AWS Bedrock 클라이언트
+├── bedrock_client.py      # Amazon Bedrock 클라이언트
 ├── config.py             # 구성 관리
 ├── dependencies.py       # 종속성 관리
 ├── text_utils.py         # 텍스트 처리 유틸리티

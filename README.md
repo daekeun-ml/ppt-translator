@@ -5,7 +5,7 @@ A powerful PowerPoint translation tool that leverages Amazon Bedrock models for 
 ## Features
 
 - **PowerPoint Translation**: Translate text content in PowerPoint presentations
-- **AWS Bedrock Integration**: Uses AWS Bedrock models for high-quality translation
+- **Amazon Bedrock Integration**: Uses Amazon Bedrock models for high-quality translation
 - **Format Preservation**: Maintains original formatting, layouts, and styles
 - **Standalone & MCP Support**: Use as a command-line tool or integrate with AI assistants via FastMCP
 - **Multiple Languages**: Supports translation between various languages
@@ -32,7 +32,7 @@ The PowerPoint Translator maintains the original formatting while accurately tra
 ### Kiro MCP Examples
 
 <details>
-<summary>접기/펼치기 제목</summary>
+<summary>Unfold</summary>
 
 ![kiro1](imgs/kiro-example1.png)
 
@@ -289,7 +289,7 @@ The FastMCP server provides the following tools:
     - `input_file`: Path to the input PowerPoint file (.pptx)
     - `target_language`: Target language code (default: 'ko')
     - `output_file`: Path for the translated output file (optional, auto-generated)
-    - `model_id`: AWS Bedrock model ID (default: Claude 3.7 Sonnet)
+    - `model_id`: Amazon Bedrock model ID (default: Claude 3.7 Sonnet)
     - `enable_polishing`: Enable natural language polishing (default: true)
 
 - **`translate_specific_slides`**: Translate only specific slides in a PowerPoint presentation
@@ -298,7 +298,7 @@ The FastMCP server provides the following tools:
     - `slide_numbers`: Comma-separated slide numbers to translate (e.g., "1,3,5" or "2-4,7")
     - `target_language`: Target language code (default: 'ko')
     - `output_file`: Path for the translated output file (optional, auto-generated)
-    - `model_id`: AWS Bedrock model ID (default: Claude 3.7 Sonnet)
+    - `model_id`: Amazon Bedrock model ID (default: Claude 3.7 Sonnet)
     - `enable_polishing`: Enable natural language polishing (default: true)
 
 - **`get_slide_info`**: Get information about slides in a PowerPoint presentation
@@ -313,7 +313,7 @@ The FastMCP server provides the following tools:
 
 - **`list_supported_languages`**: List all supported target languages for translation
 
-- **`list_supported_models`**: List all supported AWS Bedrock models
+- **`list_supported_models`**: List all supported Amazon Bedrock models
 
 - **`get_translation_help`**: Get help information about using the translator
 
@@ -394,7 +394,7 @@ ppt-translator/
 ├── fastmcp_server.py      # FastMCP server implementation
 ├── ppt_handler.py         # PowerPoint processing logic
 ├── translation_engine.py  # Translation service
-├── bedrock_client.py      # AWS Bedrock client
+├── bedrock_client.py      # Amazon Bedrock client
 ├── config.py             # Configuration management
 ├── dependencies.py       # Dependency management
 ├── text_utils.py         # Text processing utilities
