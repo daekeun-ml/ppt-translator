@@ -31,17 +31,11 @@ The PowerPoint Translator maintains the original formatting while accurately tra
 
 ### Kiro MCP Examples
 
-<details>
-<summary>Unfold</summary>
-
 ![kiro1](imgs/kiro-example1.png)
 
 ![kiro2](imgs/kiro-example2.png)
 
 ![kiro3](imgs/kiro-example3.png)
-
-</details>
-
 
 ### Usage Examples
 
@@ -49,6 +43,8 @@ The PowerPoint Translator maintains the original formatting while accurately tra
 ```bash
 uv run python server.py --translate --input-file presentation.pptx --target-language ko
 ```
+
+![standalone](imgs/standalone.png)
 
 **Translate specific slides:**
 ```bash
@@ -59,6 +55,8 @@ uv run python server.py --translate-slides "1,3,5" --input-file presentation.ppt
 ```bash
 uv run python server.py --slide-info --input-file presentation.pptx
 ```
+
+![get-slideinfo](imgs/get-slideinfo.png)
 
 ## Prerequisites
 
