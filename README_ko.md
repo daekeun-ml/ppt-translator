@@ -32,7 +32,7 @@ PowerPoint 번역기는 원본 서식을 유지하면서 콘텐츠를 정확하�
 ### Kiro MCP 예시
 
 <details>
-<summary>접기/펼치기 제목</summary>
+<summary>접기/펼치기</summary>
 
 ![kiro1](imgs/kiro-example1.png)
 
@@ -49,6 +49,9 @@ PowerPoint 번역기는 원본 서식을 유지하면서 콘텐츠를 정확하�
 uv run python server.py --translate --input-file presentation.pptx --target-language ko
 ```
 
+![standalone](imgs/standalone.png)
+
+
 **특정 슬라이드 번역:**
 ```bash
 uv run python server.py --translate-slides "1,3,5" --input-file presentation.pptx --target-language ja
@@ -58,6 +61,9 @@ uv run python server.py --translate-slides "1,3,5" --input-file presentation.ppt
 ```bash
 uv run python server.py --slide-info --input-file presentation.pptx
 ```
+
+![get-slideinfo](imgs/get-slideinfo.png)
+
 
 ## 사전 요구사항
 
