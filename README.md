@@ -1,5 +1,7 @@
 # PowerPoint Translator using Amazon Bedrock
 
+[![smithery badge](https://smithery.ai/badge/@daekeun-ml/ppt-translator)](https://smithery.ai/server/@daekeun-ml/ppt-translator)
+
 A powerful PowerPoint translation tool that leverages Amazon Bedrock models for high-quality translation. This service can be used both as a standalone command-line tool and as a FastMCP (Fast Model Context Protocol) service for integration with AI assistants like Amazon Q Developer. It translates PowerPoint presentations while preserving formatting and structure.
 
 ## Features
@@ -96,6 +98,16 @@ Before using this service, ensure your AWS credentials are properly configured. 
 The service will automatically use your configured AWS credentials. You can specify which profile to use in the `.env` file.
 
 ## Installation
+
+### Installing via Smithery
+
+To install ppt-translator for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@daekeun-ml/ppt-translator):
+
+```bash
+npx -y @smithery/cli install @daekeun-ml/ppt-translator --client claude
+```
+
+### Manual Installation
 
 1. **Clone the repository**:
    ```bash
