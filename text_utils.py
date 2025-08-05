@@ -89,9 +89,9 @@ class TextProcessor:
            (cleaned.startswith("'") and cleaned.endswith("'")):
             cleaned = cleaned[1:-1].strip()
         
-        # Remove numbered prefixes like "1. ", "2. ", etc.
-        cleaned = re.sub(r'^\d+\.\s*', '', cleaned)
-        
+        # Remove numbered prefixes like "1. ", "2. ", etc.        
+        cleaned = re.sub(r'^\d+\.\s+', '', cleaned)
+                
         # Remove bullet points
         cleaned = re.sub(r'^[•\-\*]\s*', '', cleaned)
         
