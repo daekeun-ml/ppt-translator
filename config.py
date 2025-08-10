@@ -29,6 +29,34 @@ class Config:
     # Debug settings
     DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
     
+    # Post-processing settings
+    ENABLE_TEXT_AUTOFIT = os.getenv('ENABLE_TEXT_AUTOFIT', 'true').lower() == 'true'
+    TEXT_LENGTH_THRESHOLD = int(os.getenv('TEXT_LENGTH_THRESHOLD', '10'))
+    
+    # Font settings by language
+    FONT_KOREAN = os.getenv('FONT_KOREAN', '맑은 고딕')
+    FONT_JAPANESE = os.getenv('FONT_JAPANESE', 'Yu Gothic UI')
+    FONT_ENGLISH = os.getenv('FONT_ENGLISH', 'Amazon Ember')
+    FONT_CHINESE = os.getenv('FONT_CHINESE', 'Microsoft YaHei')
+    FONT_DEFAULT = os.getenv('FONT_DEFAULT', 'Arial')
+    
+    # Font mapping by language code
+    FONT_MAP = {
+        'ko': FONT_KOREAN,
+        'ja': FONT_JAPANESE,
+        'en': FONT_ENGLISH,
+        'en-US': FONT_ENGLISH,
+        'en-GB': FONT_ENGLISH,
+        'en-AU': FONT_ENGLISH,
+        'en-CA': FONT_ENGLISH,
+        'zh': FONT_CHINESE,
+        'zh-CN': FONT_CHINESE,
+        'zh-TW': FONT_CHINESE,
+        'zh-HK': FONT_CHINESE,
+        'zh-SG': FONT_CHINESE,
+        'zh-MY': FONT_CHINESE,
+    }
+    
     # Supported models
     SUPPORTED_MODELS = [
         "amazon.nova-micro-v1:0",
@@ -242,6 +270,11 @@ class Config:
         load_dotenv(dotenv_path=env_path, override=True)
     
     @classmethod
+    def get_font_for_language(cls, language_code: str) -> str:
+        """Get the appropriate font for a given language code"""
+        return cls.FONT_MAP.get(language_code, cls.FONT_DEFAULT)
+    
+    @classmethod
     def check_aws_credentials(cls):
         """Check if AWS credentials are properly configured"""
         import boto3
@@ -271,3 +304,41 @@ class Config:
             return False, "Incomplete AWS credentials. Please run 'aws configure' to complete your credential setup."
         except Exception as e:
             return False, f"AWS credential verification failed: {str(e)}"
+    
+    def __init__(self):
+        """Initialize configuration with environment variables"""
+        self._env_vars = {}
+        self._load_env_vars()
+    
+    def _load_env_vars(self):
+        """Load all environment variables"""
+        for key, value in os.environ.items():
+            self._env_vars[key] = value
+    
+    def get(self, key: str, default: str = None) -> str:
+        """Get configuration value by key"""
+        return self._env_vars.get(key, default)
+    
+    def get_bool(self, key: str, default: bool = False) -> bool:
+        """Get boolean configuration value"""
+        value = self.get(key, str(default).lower())
+        return value.lower() in ('true', '1', 'yes', 'on')
+    
+    def get_int(self, key: str, default: int = 0) -> int:
+        """Get integer configuration value"""
+        try:
+            return int(self.get(key, str(default)))
+        except (ValueError, TypeError):
+            return default
+    
+    def get_float(self, key: str, default: float = 0.0) -> float:
+        """Get float configuration value"""
+        try:
+            return float(self.get(key, str(default)))
+        except (ValueError, TypeError):
+            return default
+    
+    def set(self, key: str, value: str):
+        """Set configuration value"""
+        self._env_vars[key] = value
+        os.environ[key] = value

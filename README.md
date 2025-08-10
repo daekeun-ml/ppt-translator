@@ -7,6 +7,8 @@ A powerful PowerPoint translation tool that leverages Amazon Bedrock models for 
 - **PowerPoint Translation**: Translate text content in PowerPoint presentations
 - **Amazon Bedrock Integration**: Uses Amazon Bedrock models for high-quality translation
 - **Format Preservation**: Maintains original formatting, layouts, and styles
+- **Language-Specific Fonts**: Automatically applies appropriate fonts for target languages
+- **Color & Style Preservation**: Preserves original text colors and formatting even for untranslated content
 - **Standalone & MCP Support**: Use as a command-line tool or integrate with AI assistants via FastMCP
 - **Multiple Languages**: Supports translation between various languages
 - **Batch Processing**: Can handle multiple slides and text elements efficiently
@@ -119,7 +121,7 @@ The service will automatically use your configured AWS credentials. You can spec
    ```
    
    Edit `.env` file with your configuration:
-   ```
+   ```bash
    # AWS Configuration
    AWS_REGION=us-east-1
    AWS_PROFILE=default
@@ -135,8 +137,19 @@ The service will automatically use your configured AWS credentials. You can spec
    BATCH_SIZE=20
    CONTEXT_THRESHOLD=5
    
+   # Font Settings by Language
+   FONT_KOREAN=맑은 고딕
+   FONT_JAPANESE=Yu Gothic UI
+   FONT_ENGLISH=Amazon Ember
+   FONT_CHINESE=Microsoft YaHei
+   FONT_DEFAULT=Arial
+   
    # Debug Settings
    DEBUG=false
+
+   # Post-processing Settings
+   ENABLE_TEXT_AUTOFIT=true
+   TEXT_LENGTH_THRESHOLD=10
    ```
 
    **Note**: AWS credentials (Access Key ID and Secret Access Key) are not needed in the `.env` file if you have already configured them using `aws configure`. The service will automatically use your AWS CLI credentials.
@@ -374,14 +387,6 @@ The service supports translation between major languages including:
    - Use `uv run` to ensure proper virtual environment activation
    - Install dependencies: `uv sync`
 
-### Debug Mode
-
-Enable debug logging:
-
-```bash
-uv run python server.py --mcp --debug
-```
-
 ## Development
 
 ### Project Structure
@@ -393,6 +398,7 @@ ppt-translator/
 ├── ppt_handler.py         # PowerPoint processing logic
 ├── translation_engine.py  # Translation service
 ├── bedrock_client.py      # Amazon Bedrock client
+├── post_processing.py     # Post-processing utilities for translations
 ├── config.py             # Configuration management
 ├── dependencies.py       # Dependency management
 ├── text_utils.py         # Text processing utilities

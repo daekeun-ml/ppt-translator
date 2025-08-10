@@ -186,19 +186,108 @@ class FormattingExtractor:
     
     @staticmethod
     def _extract_font_color(font):
-        """Extract font color information"""
+        """Extract font color information with enhanced preservation"""
         try:
             if not (hasattr(font, 'color') and font.color):
                 return None
                 
             color_obj = font.color
+            
+            # Debug logging
             if hasattr(color_obj, 'type'):
-                if color_obj.type == 1 and hasattr(color_obj, 'rgb'):  # RGB
-                    return ('rgb', str(color_obj.rgb))
-                elif color_obj.type == 2 and hasattr(color_obj, 'theme_color'):  # Theme
-                    return ('theme', color_obj.theme_color)
-        except Exception:
-            pass
+                logger.debug(f"Color type detected: {color_obj.type}")
+            
+            # Check for RGB color (MSO_COLOR_TYPE.RGB = 1)
+            if hasattr(color_obj, 'type') and color_obj.type == 1:
+                if hasattr(color_obj, 'rgb') and color_obj.rgb:
+                    # Extract RGB as individual components for better preservation
+                    rgb = color_obj.rgb
+                    try:
+                        if hasattr(rgb, 'r') and hasattr(rgb, 'g') and hasattr(rgb, 'b'):
+                            rgb_info = {'r': rgb.r, 'g': rgb.g, 'b': rgb.b}
+                        else:
+                            # Handle RGBColor object directly
+                            rgb_info = {'r': rgb.r, 'g': rgb.g, 'b': rgb.b}
+                    except AttributeError:
+                        # Handle string RGB values (hex format like 'FFFF00')
+                        try:
+                            rgb_str = str(rgb)
+                            if len(rgb_str) == 6 and all(c in '0123456789ABCDEFabcdef' for c in rgb_str):
+                                # Parse hex string
+                                rgb_val = int(rgb_str, 16)
+                                rgb_info = {
+                                    'r': (rgb_val >> 16) & 0xFF,
+                                    'g': (rgb_val >> 8) & 0xFF,
+                                    'b': rgb_val & 0xFF
+                                }
+                            else:
+                                # Try to parse as integer
+                                rgb_val = int(rgb_str) if rgb_str.isdigit() else int(rgb)
+                                rgb_info = {
+                                    'r': (rgb_val >> 16) & 0xFF,
+                                    'g': (rgb_val >> 8) & 0xFF,
+                                    'b': rgb_val & 0xFF
+                                }
+                        except (ValueError, TypeError) as e:
+                            logger.debug(f"Could not parse RGB value: {rgb}, error: {e}")
+                            return None
+                    
+                    logger.debug(f"Extracted RGB color: {rgb_info}")
+                    return ('rgb', rgb_info)
+            
+            # Check for theme color (MSO_COLOR_TYPE.THEME = 2)
+            elif hasattr(color_obj, 'type') and color_obj.type == 2:
+                if hasattr(color_obj, 'theme_color'):
+                    theme_info = {'theme_color': color_obj.theme_color}
+                    
+                    # Preserve brightness adjustments (tint/shade)
+                    if hasattr(color_obj, 'brightness') and color_obj.brightness is not None:
+                        theme_info['brightness'] = color_obj.brightness
+                    
+                    logger.debug(f"Extracted theme color: {theme_info}")
+                    return ('theme', theme_info)
+            
+            # Check for scheme color (MSO_COLOR_TYPE.SCHEME = 3)
+            elif hasattr(color_obj, 'type') and color_obj.type == 3:
+                if hasattr(color_obj, 'scheme_color'):
+                    logger.debug(f"Extracted scheme color: {color_obj.scheme_color}")
+                    return ('scheme', color_obj.scheme_color)
+            
+            # Fallback: try to get RGB directly if available
+            elif hasattr(color_obj, 'rgb') and color_obj.rgb:
+                rgb = color_obj.rgb
+                try:
+                    if hasattr(rgb, 'r') and hasattr(rgb, 'g') and hasattr(rgb, 'b'):
+                        rgb_info = {'r': rgb.r, 'g': rgb.g, 'b': rgb.b}
+                    else:
+                        rgb_info = {'r': rgb.r, 'g': rgb.g, 'b': rgb.b}
+                except AttributeError:
+                    try:
+                        rgb_str = str(rgb)
+                        if len(rgb_str) == 6 and all(c in '0123456789ABCDEFabcdef' for c in rgb_str):
+                            rgb_val = int(rgb_str, 16)
+                            rgb_info = {
+                                'r': (rgb_val >> 16) & 0xFF,
+                                'g': (rgb_val >> 8) & 0xFF,
+                                'b': rgb_val & 0xFF
+                            }
+                        else:
+                            rgb_val = int(rgb_str) if rgb_str.isdigit() else int(rgb)
+                            rgb_info = {
+                                'r': (rgb_val >> 16) & 0xFF,
+                                'g': (rgb_val >> 8) & 0xFF,
+                                'b': rgb_val & 0xFF
+                            }
+                    except (ValueError, TypeError) as e:
+                        logger.debug(f"Could not parse fallback RGB value: {rgb}, error: {e}")
+                        return None
+                
+                logger.debug(f"Extracted fallback RGB color: {rgb_info}")
+                return ('rgb', rgb_info)
+                
+        except Exception as e:
+            logger.debug(f"Error extracting font color: {e}")
+            
         return None
     
     @staticmethod
@@ -211,8 +300,8 @@ class FormattingApplier:
     """Handles application of formatting to PowerPoint elements"""
     
     @staticmethod
-    def apply_paragraph_structure(paragraph, para_info, new_text: str):
-        """Apply paragraph structure and formatting"""
+    def apply_paragraph_structure(paragraph, para_info, new_text: str, target_language: str = None):
+        """Apply paragraph structure and formatting with language-specific font"""
         try:
             # Clear paragraph content
             paragraph.clear()
@@ -222,19 +311,31 @@ class FormattingApplier:
             
             # Apply text with run formatting
             if para_info and para_info.get('runs'):
-                FormattingApplier._apply_runs_with_formatting(paragraph, new_text, para_info['runs'])
+                FormattingApplier._apply_runs_with_formatting(paragraph, new_text, para_info['runs'], target_language)
             else:
                 # Simple text
                 run = paragraph.add_run()
                 run.text = new_text
                 if para_info and para_info.get('runs'):
-                    FormattingApplier._apply_run_formatting(run, para_info['runs'][0]['formatting'])
+                    FormattingApplier._apply_run_formatting(run, para_info['runs'][0]['formatting'], target_language)
+                elif target_language:
+                    # Apply language-specific font even without existing formatting
+                    language_font = Config.get_font_for_language(target_language)
+                    run.font.name = language_font
+                    logger.debug(f"Applied default font '{language_font}' for language '{target_language}'")
                     
         except Exception as e:
             logger.error(f"Failed to apply paragraph structure: {e}")
             # Fallback
             paragraph.clear()
-            paragraph.add_run().text = new_text
+            run = paragraph.add_run()
+            run.text = new_text
+            if target_language:
+                try:
+                    language_font = Config.get_font_for_language(target_language)
+                    run.font.name = language_font
+                except Exception:
+                    pass
     
     @staticmethod
     def _apply_paragraph_properties(paragraph, para_info):
@@ -344,17 +445,17 @@ class FormattingApplier:
             buAutoNum.set('startAt', start_at)
     
     @staticmethod
-    def _apply_runs_with_formatting(paragraph, new_text: str, run_info_list):
-        """Apply text with preserved run formatting"""
+    def _apply_runs_with_formatting(paragraph, new_text: str, run_info_list, target_language: str = None):
+        """Apply text with preserved run formatting and language-specific font"""
         try:
             if len(run_info_list) == 1:
                 # Single run - simple case
                 run = paragraph.add_run()
                 run.text = new_text
-                FormattingApplier._apply_run_formatting(run, run_info_list[0]['formatting'])
+                FormattingApplier._apply_run_formatting(run, run_info_list[0]['formatting'], target_language)
             else:
                 # Multiple runs - preserve special formatting
-                FormattingApplier._apply_multiple_runs(paragraph, new_text, run_info_list)
+                FormattingApplier._apply_multiple_runs(paragraph, new_text, run_info_list, target_language)
                 
         except Exception as e:
             logger.error(f"Error applying runs with formatting: {e}")
@@ -363,11 +464,17 @@ class FormattingApplier:
                 run = paragraph.add_run()
                 run.text = new_text
                 if run_info_list:
-                    FormattingApplier._apply_run_formatting(run, run_info_list[0]['formatting'])
+                    FormattingApplier._apply_run_formatting(run, run_info_list[0]['formatting'], target_language)
+                elif target_language:
+                    try:
+                        language_font = Config.get_font_for_language(target_language)
+                        run.font.name = language_font
+                    except Exception:
+                        pass
     
     @staticmethod
-    def _apply_multiple_runs(paragraph, new_text: str, run_info_list):
-        """Apply multiple runs with different formatting"""
+    def _apply_multiple_runs(paragraph, new_text: str, run_info_list, target_language: str = None):
+        """Apply multiple runs with different formatting and language-specific font"""
         remaining_text = new_text
         
         for run_info in run_info_list:
@@ -380,12 +487,12 @@ class FormattingApplier:
                 if parts[0]:
                     run = paragraph.add_run()
                     run.text = parts[0]
-                    FormattingApplier._apply_run_formatting(run, run_info_list[0]['formatting'])
+                    FormattingApplier._apply_run_formatting(run, run_info_list[0]['formatting'], target_language)
                 
                 # This run with its formatting
                 run = paragraph.add_run()
                 run.text = original_text
-                FormattingApplier._apply_run_formatting(run, run_info['formatting'])
+                FormattingApplier._apply_run_formatting(run, run_info['formatting'], target_language)
                 
                 # Apply hyperlink if present
                 if 'hyperlink' in run_info:
@@ -401,30 +508,39 @@ class FormattingApplier:
         if remaining_text:
             run = paragraph.add_run()
             run.text = remaining_text
-            FormattingApplier._apply_run_formatting(run, run_info_list[-1]['formatting'])
+            FormattingApplier._apply_run_formatting(run, run_info_list[-1]['formatting'], target_language)
         
         # If no runs were added, add the whole text
         if not paragraph.runs:
             run = paragraph.add_run()
             run.text = new_text
-            FormattingApplier._apply_run_formatting(run, run_info_list[0]['formatting'])
+            FormattingApplier._apply_run_formatting(run, run_info_list[0]['formatting'], target_language)
     
     @staticmethod
-    def _apply_run_formatting(run, formatting: Dict[str, Any]):
-        """Apply formatting to a run safely"""
+    def _apply_run_formatting(run, formatting: Dict[str, Any], target_language: str = None):
+        """Apply formatting to a run safely with language-specific font"""
         try:
             if not (hasattr(run, 'font') and run.font):
                 return
                 
             font = run.font
             
-            # Apply basic properties
-            for key, attr in [('font_name', 'name'), ('font_size', 'size'), 
-                             ('font_bold', 'bold'), ('font_italic', 'italic')]:
+            # Apply language-specific font if target language is provided
+            if target_language:
+                language_font = Config.get_font_for_language(target_language)
+                font.name = language_font
+                logger.debug(f"Applied font '{language_font}' for language '{target_language}'")
+            
+            # Apply basic properties (but preserve original font if no target language)
+            for key, attr in [('font_size', 'size'), ('font_bold', 'bold'), ('font_italic', 'italic')]:
                 if formatting.get(key) is not None:
                     setattr(font, attr, formatting[key])
             
-            # Apply color
+            # Apply font name only if not overridden by language-specific font
+            if not target_language and formatting.get('font_name') is not None:
+                font.name = formatting['font_name']
+            
+            # Apply color - preserve original color for better visibility
             FormattingApplier._apply_font_color(font, formatting.get('font_color'))
             
         except Exception as e:
@@ -432,40 +548,103 @@ class FormattingApplier:
     
     @staticmethod
     def _apply_font_color(font, color_info):
-        """Apply font color information"""
+        """Apply font color information with enhanced preservation"""
         if not color_info or not isinstance(color_info, tuple) or len(color_info) != 2:
             return
             
         try:
             color_type, color_value = color_info
+            logger.debug(f"Applying color - type: {color_type}, value: {color_value}")
+            
             if color_type == 'rgb' and color_value:
                 FormattingApplier._apply_rgb_color(font, color_value)
-            elif color_type == 'theme':
-                font.color.theme_color = color_value
-        except Exception:
-            pass
+            elif color_type == 'theme' and color_value:
+                FormattingApplier._apply_theme_color(font, color_value)
+            elif color_type == 'scheme' and color_value:
+                FormattingApplier._apply_scheme_color(font, color_value)
+                
+        except Exception as e:
+            logger.debug(f"Error applying font color: {e}")
     
     @staticmethod
     def _apply_rgb_color(font, color_value):
-        """Apply RGB color to font"""
-        if isinstance(color_value, str) and len(color_value) == 6:
-            rgb_int = int(color_value, 16)
-            font.color.rgb = RGBColor(
-                (rgb_int >> 16) & 0xFF,
-                (rgb_int >> 8) & 0xFF,
-                rgb_int & 0xFF
-            )
+        """Apply RGB color to font with enhanced handling"""
+        try:
+            if isinstance(color_value, dict):
+                # New format with individual RGB components
+                r = color_value.get('r', 0)
+                g = color_value.get('g', 0)
+                b = color_value.get('b', 0)
+                logger.debug(f"Applying RGB color: R={r}, G={g}, B={b}")
+                font.color.rgb = RGBColor(r, g, b)
+            elif isinstance(color_value, str) and len(color_value) == 6:
+                # Legacy format - hex string
+                rgb_int = int(color_value, 16)
+                r = (rgb_int >> 16) & 0xFF
+                g = (rgb_int >> 8) & 0xFF
+                b = rgb_int & 0xFF
+                logger.debug(f"Applying RGB color from hex: R={r}, G={g}, B={b}")
+                font.color.rgb = RGBColor(r, g, b)
+            elif isinstance(color_value, int):
+                # Integer RGB value
+                r = (color_value >> 16) & 0xFF
+                g = (color_value >> 8) & 0xFF
+                b = color_value & 0xFF
+                logger.debug(f"Applying RGB color from int: R={r}, G={g}, B={b}")
+                font.color.rgb = RGBColor(r, g, b)
+        except Exception as e:
+            logger.debug(f"Error applying RGB color: {e}")
+    
+    @staticmethod
+    def _apply_theme_color(font, theme_info):
+        """Apply theme color with brightness adjustments"""
+        try:
+            if isinstance(theme_info, dict):
+                theme_color = theme_info.get('theme_color')
+                if theme_color is not None:
+                    logger.debug(f"Applying theme color: {theme_color}")
+                    font.color.theme_color = theme_color
+                    
+                    # Apply brightness adjustment if available
+                    brightness = theme_info.get('brightness')
+                    if brightness is not None:
+                        logger.debug(f"Applying brightness: {brightness}")
+                        font.color.brightness = brightness
+            else:
+                # Legacy format - direct theme color value
+                logger.debug(f"Applying legacy theme color: {theme_info}")
+                font.color.theme_color = theme_info
+        except Exception as e:
+            logger.debug(f"Error applying theme color: {e}")
+    
+    @staticmethod
+    def _apply_scheme_color(font, scheme_color):
+        """Apply scheme color"""
+        try:
+            logger.debug(f"Applying scheme color: {scheme_color}")
+            font.color.scheme_color = scheme_color
+        except Exception as e:
+            logger.debug(f"Error applying scheme color: {e}")
 
 
 class TextFrameUpdater:
     """Handles updating PowerPoint text frames with translations"""
     
     @staticmethod
-    def update_text_frame(text_frame, new_text: str):
-        """Update text frame while preserving formatting, bullets, and indentation"""
+    def update_text_frame(text_frame, new_text: str, target_language: str = None):
+        """Update text frame while preserving formatting, bullets, and indentation with language-specific font"""
         try:
             if not text_frame.paragraphs:
                 text_frame.text = new_text
+                # Apply language-specific font to simple text
+                if target_language and text_frame.paragraphs:
+                    try:
+                        language_font = Config.get_font_for_language(target_language)
+                        for paragraph in text_frame.paragraphs:
+                            for run in paragraph.runs:
+                                run.font.name = language_font
+                    except Exception:
+                        pass
                 return
             
             # Extract paragraph structure information
@@ -476,45 +655,54 @@ class TextFrameUpdater:
             
             if has_hyperlinks:
                 logger.debug("Hyperlinks detected, using safe hyperlink preservation")
-                TextFrameUpdater._update_with_hyperlinks_safe(text_frame, new_text, paragraph_info)
+                TextFrameUpdater._update_with_hyperlinks_safe(text_frame, new_text, paragraph_info, target_language)
                 return
             
             # Choose update strategy based on structure
-            TextFrameUpdater._choose_update_strategy(text_frame, new_text, paragraph_info)
+            TextFrameUpdater._choose_update_strategy(text_frame, new_text, paragraph_info, target_language)
                 
         except Exception as e:
             logger.error(f"Formatting error: {str(e)}")
             text_frame.text = new_text
+            # Apply language-specific font to fallback text
+            if target_language and text_frame.paragraphs:
+                try:
+                    language_font = Config.get_font_for_language(target_language)
+                    for paragraph in text_frame.paragraphs:
+                        for run in paragraph.runs:
+                            run.font.name = language_font
+                except Exception:
+                    pass
     
     @staticmethod
-    def _choose_update_strategy(text_frame, new_text: str, paragraph_info):
-        """Choose the appropriate update strategy"""
+    def _choose_update_strategy(text_frame, new_text: str, paragraph_info, target_language: str = None):
+        """Choose the appropriate update strategy with language-specific font"""
         new_lines = new_text.strip().split('\n')
         
         # Single paragraph case
         if len(text_frame.paragraphs) == 1 and len(new_lines) == 1:
             para_info = paragraph_info[0] if paragraph_info else None
-            FormattingApplier.apply_paragraph_structure(text_frame.paragraphs[0], para_info, new_text.strip())
+            FormattingApplier.apply_paragraph_structure(text_frame.paragraphs[0], para_info, new_text.strip(), target_language)
             return
         
         # Multiple paragraphs with same count
         if len(new_lines) == len(text_frame.paragraphs):
-            TextFrameUpdater._update_matching_paragraphs(text_frame, new_lines, paragraph_info)
+            TextFrameUpdater._update_matching_paragraphs(text_frame, new_lines, paragraph_info, target_language)
         else:
             # Different structure - rebuild with preserved formatting
-            TextFrameUpdater._rebuild_with_structure(text_frame, new_text, paragraph_info)
+            TextFrameUpdater._rebuild_with_structure(text_frame, new_text, paragraph_info, target_language)
     
     @staticmethod
-    def _update_matching_paragraphs(text_frame, new_lines, paragraph_info):
-        """Update paragraphs when counts match"""
+    def _update_matching_paragraphs(text_frame, new_lines, paragraph_info, target_language: str = None):
+        """Update paragraphs when counts match with language-specific font"""
         for i, (paragraph, new_line) in enumerate(zip(text_frame.paragraphs, new_lines)):
             if new_line.strip():
                 para_info = paragraph_info[i] if i < len(paragraph_info) else None
-                FormattingApplier.apply_paragraph_structure(paragraph, para_info, new_line.strip())
+                FormattingApplier.apply_paragraph_structure(paragraph, para_info, new_line.strip(), target_language)
     
     @staticmethod
-    def _rebuild_with_structure(text_frame, new_text: str, paragraph_info):
-        """Rebuild text frame with preserved structure"""
+    def _rebuild_with_structure(text_frame, new_text: str, paragraph_info, target_language: str = None):
+        """Rebuild text frame with preserved structure and language-specific font"""
         try:
             text_frame.clear()
             new_lines = new_text.strip().split('\n')
@@ -527,15 +715,24 @@ class TextFrameUpdater:
                 
                 # Use corresponding paragraph info if available
                 para_info = paragraph_info[i] if i < len(paragraph_info) else (paragraph_info[0] if paragraph_info else None)
-                FormattingApplier.apply_paragraph_structure(paragraph, para_info, line.strip())
+                FormattingApplier.apply_paragraph_structure(paragraph, para_info, line.strip(), target_language)
                 
         except Exception as e:
             logger.error(f"Structure rebuild failed: {e}")
             text_frame.text = new_text
+            # Apply language-specific font to fallback text
+            if target_language and text_frame.paragraphs:
+                try:
+                    language_font = Config.get_font_for_language(target_language)
+                    for paragraph in text_frame.paragraphs:
+                        for run in paragraph.runs:
+                            run.font.name = language_font
+                except Exception:
+                    pass
     
     @staticmethod
-    def _update_with_hyperlinks_safe(text_frame, new_text: str, paragraph_info=None):
-        """Update text frame while preserving hyperlinks and structure"""
+    def _update_with_hyperlinks_safe(text_frame, new_text: str, paragraph_info=None, target_language: str = None):
+        """Update text frame while preserving hyperlinks and structure with language-specific font"""
         try:
             new_lines = new_text.strip().split('\n')
             
@@ -553,17 +750,33 @@ class TextFrameUpdater:
                 
                 if para_info:
                     FormattingApplier._apply_paragraph_properties(paragraph, para_info)
-                    TextFrameUpdater._apply_hyperlinks_to_paragraph(paragraph, line.strip(), para_info)
+                    TextFrameUpdater._apply_hyperlinks_to_paragraph(paragraph, line.strip(), para_info, target_language)
                 else:
-                    paragraph.add_run().text = line.strip()
+                    run = paragraph.add_run()
+                    run.text = line.strip()
+                    if target_language:
+                        try:
+                            language_font = Config.get_font_for_language(target_language)
+                            run.font.name = language_font
+                        except Exception:
+                            pass
                     
         except Exception as e:
             logger.error(f"Safe hyperlink preservation failed: {e}")
             text_frame.text = new_text
+            # Apply language-specific font to fallback text
+            if target_language and text_frame.paragraphs:
+                try:
+                    language_font = Config.get_font_for_language(target_language)
+                    for paragraph in text_frame.paragraphs:
+                        for run in paragraph.runs:
+                            run.font.name = language_font
+                except Exception:
+                    pass
     
     @staticmethod
-    def _apply_hyperlinks_to_paragraph(paragraph, line: str, para_info):
-        """Apply hyperlinks to paragraph with structure preservation"""
+    def _apply_hyperlinks_to_paragraph(paragraph, line: str, para_info, target_language: str = None):
+        """Apply hyperlinks to paragraph with structure preservation and language-specific font"""
         try:
             runs_info = para_info.get('runs', [])
             hyperlink_runs = [run for run in runs_info if run.get('hyperlink')]
@@ -573,7 +786,13 @@ class TextFrameUpdater:
                 run = paragraph.add_run()
                 run.text = line
                 if runs_info:
-                    FormattingApplier._apply_run_formatting(run, runs_info[0]['formatting'])
+                    FormattingApplier._apply_run_formatting(run, runs_info[0]['formatting'], target_language)
+                elif target_language:
+                    try:
+                        language_font = Config.get_font_for_language(target_language)
+                        run.font.name = language_font
+                    except Exception:
+                        pass
                 return
             
             # Apply hyperlinks
@@ -595,12 +814,12 @@ class TextFrameUpdater:
                         run.text = parts[0]
                         default_formatting = next((r['formatting'] for r in runs_info if not r.get('hyperlink')), 
                                                 runs_info[0]['formatting'] if runs_info else {})
-                        FormattingApplier._apply_run_formatting(run, default_formatting)
+                        FormattingApplier._apply_run_formatting(run, default_formatting, target_language)
                     
                     # Hyperlink text
                     run = paragraph.add_run()
                     run.text = hyperlink_text
-                    FormattingApplier._apply_run_formatting(run, hyperlink_run['formatting'])
+                    FormattingApplier._apply_run_formatting(run, hyperlink_run['formatting'], target_language)
                     
                     # Apply hyperlink
                     try:
@@ -618,7 +837,7 @@ class TextFrameUpdater:
                 run.text = remaining_text
                 default_formatting = next((r['formatting'] for r in runs_info if not r.get('hyperlink')), 
                                         runs_info[0]['formatting'] if runs_info else {})
-                FormattingApplier._apply_run_formatting(run, default_formatting)
+                FormattingApplier._apply_run_formatting(run, default_formatting, target_language)
                 
         except Exception as e:
             logger.error(f"Error applying hyperlinks: {e}")
@@ -626,7 +845,13 @@ class TextFrameUpdater:
                 run = paragraph.add_run()
                 run.text = line
                 if para_info.get('runs'):
-                    FormattingApplier._apply_run_formatting(run, para_info['runs'][0]['formatting'])
+                    FormattingApplier._apply_run_formatting(run, para_info['runs'][0]['formatting'], target_language)
+                elif target_language:
+                    try:
+                        language_font = Config.get_font_for_language(target_language)
+                        run.font.name = language_font
+                    except Exception:
+                        pass
     
     @staticmethod
     def _has_hyperlinks(text_frame):
@@ -702,7 +927,7 @@ class ComplexityAnalyzer:
     def _has_bullet_formatting(paragraph) -> bool:
         """Check if paragraph has bullet formatting"""
         try:
-            if not (hasattr(paragraph, '_element') and paragraph._element):
+            if not (hasattr(paragraph, '_element') and paragraph._element is not None):
                 return False
                 
             pPr = paragraph._element.find('.//{http://schemas.openxmlformats.org/drawingml/2006/main}pPr')
@@ -792,7 +1017,7 @@ class TranslationStrategy:
         return False
     
     def _translate_individually(self, text_items: List[Dict], target_language: str) -> int:
-        """Translate each text individually to preserve formatting"""
+        """Translate each text individually to preserve formatting with language-specific font"""
         translated_count = 0
         
         logger.info("🎨 Using individual translation to preserve complex formatting")
@@ -806,31 +1031,34 @@ class TranslationStrategy:
                 logger.debug(f"Translating item {i+1}/{len(text_items)}: '{original_text[:50]}...'")
                 translation = self.engine.translate_text(original_text, target_language)
                 
-                if original_text != translation:
-                    if self._apply_translation_to_item(item, translation):
-                        translated_count += 1
-                        logger.debug(f"✅ Applied translation to {item['type']}")
+                # Apply translation regardless of whether text changed (for font/color preservation)
+                if self._apply_translation_to_item(item, translation, target_language):
+                    translated_count += 1
+                    if original_text != translation:
+                        logger.debug(f"✅ Translated {item['type']}: '{original_text[:30]}...' -> '{translation[:30]}...'")
+                    else:
+                        logger.debug(f"🎨 Applied formatting to unchanged {item['type']}: '{original_text[:30]}...'")
                         
             except Exception as e:
                 logger.error(f"Individual translation failed for item {i}: {str(e)}")
         
-        logger.info(f"🎯 Individual translation completed: {translated_count}/{len(text_items)} items translated")
+        logger.info(f"🎯 Individual translation completed: {translated_count}/{len(text_items)} items processed")
         return translated_count
     
     def _translate_with_context(self, text_items: List[Dict], target_language: str) -> int:
-        """Translate using context-aware approach"""
+        """Translate using context-aware approach with language-specific font"""
         if not text_items:
             return 0
         
         try:
             translations = self.engine.translate_with_context(text_items, target_language)
-            return self._apply_translations(text_items, translations)
+            return self._apply_translations(text_items, translations, target_language)
         except Exception as e:
             logger.error(f"Context translation failed: {str(e)}")
             return self._translate_with_batch(text_items, target_language)
     
     def _translate_with_batch(self, text_items: List[Dict], target_language: str) -> int:
-        """Translate using batch approach"""
+        """Translate using batch approach with language-specific font"""
         if not text_items:
             return 0
         
@@ -844,22 +1072,22 @@ class TranslationStrategy:
             
             try:
                 batch_translations = self.engine.translate_batch(batch_texts, target_language)
-                translated_count += self._apply_translations(batch_items, batch_translations)
+                translated_count += self._apply_translations(batch_items, batch_translations, target_language)
             except Exception as e:
                 logger.error(f"Batch translation failed: {str(e)}")
                 # Individual fallback
                 for item in batch_items:
                     try:
                         translation = self.engine.translate_text(item['text'], target_language)
-                        if self._apply_translation_to_item(item, translation):
+                        if self._apply_translation_to_item(item, translation, target_language):
                             translated_count += 1
                     except Exception:
                         pass
         
         return translated_count
     
-    def _apply_translations(self, text_items: List[Dict], translations: List[str]) -> int:
-        """Apply translations back to the original shapes"""
+    def _apply_translations(self, text_items: List[Dict], translations: List[str], target_language: str = None) -> int:
+        """Apply translations back to the original shapes with language-specific font"""
         if len(text_items) != len(translations):
             logger.error(f"Translation count mismatch: {len(text_items)} items, {len(translations)} translations")
             return 0
@@ -867,32 +1095,60 @@ class TranslationStrategy:
         translated_count = 0
         
         for item, translation in zip(text_items, translations):
-            if item['text'] != translation:
-                if self._apply_translation_to_item(item, translation):
-                    translated_count += 1
+            # Check if translation actually changed or if we should treat unchanged text as translated
+            original_text = item['text']
+            is_actually_translated = original_text != translation
+            
+            # Apply translation (or preserve original with new formatting)
+            if self._apply_translation_to_item(item, translation, target_language):
+                translated_count += 1
+                
+                # Log translation status
+                if is_actually_translated:
+                    logger.debug(f"✅ Translated: '{original_text[:30]}...' -> '{translation[:30]}...'")
+                else:
+                    logger.debug(f"🎨 Applied formatting to unchanged text: '{original_text[:30]}...'")
         
         return translated_count
     
-    def _apply_translation_to_item(self, item: Dict, translation: str) -> bool:
-        """Apply translation to a single item"""
+    def _apply_translation_to_item(self, item: Dict, translation: str, target_language: str = None) -> bool:
+        """Apply translation to a single item with language-specific font"""
         try:
             item_type = item['type']
             
             if item_type == 'table_cell':
                 cell = item['cell']
                 if hasattr(cell, 'text_frame') and cell.text_frame:
-                    self.text_updater.update_text_frame(cell.text_frame, translation)
+                    self.text_updater.update_text_frame(cell.text_frame, translation, target_language)
                 else:
                     cell.text = translation
+                    # Apply language-specific font to table cell
+                    if target_language and hasattr(cell, 'text_frame') and cell.text_frame:
+                        try:
+                            language_font = Config.get_font_for_language(target_language)
+                            for paragraph in cell.text_frame.paragraphs:
+                                for run in paragraph.runs:
+                                    run.font.name = language_font
+                        except Exception:
+                            pass
                 return True
                 
             elif item_type == 'text_frame_unified':
                 text_frame = item['text_frame']
-                self.text_updater.update_text_frame(text_frame, translation)
+                self.text_updater.update_text_frame(text_frame, translation, target_language)
                 return True
                 
             elif item_type == 'direct_text':
                 item['shape'].text = translation
+                # Apply language-specific font to direct text
+                if target_language and hasattr(item['shape'], 'text_frame') and item['shape'].text_frame:
+                    try:
+                        language_font = Config.get_font_for_language(target_language)
+                        for paragraph in item['shape'].text_frame.paragraphs:
+                            for run in paragraph.runs:
+                                run.font.name = language_font
+                    except Exception:
+                        pass
                 return True
             
         except Exception as e:

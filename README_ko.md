@@ -1,13 +1,15 @@
 # Amazon Bedrock을 활용한 PowerPoint 번역기
 
-Amazon Bedrock 모델을 활용하여 고품질 번역을 제공하는 강력한 PowerPoint 번역 도구입니다. 이 서비스는 독립형 명령줄 도구와 Amazon Q Developer와 같은 AI 어시스턴트와 통합할 수 있는 FastMCP(Fast Model Context Protocol) 서비스로 모두 사용할 수 있습니다. PowerPoint 프레젠테이션의 서식과 구조를 유지하면서 번역합니다.
+Amazon Bedrock 모델을 활용하여 고품질 번역을 제공하는 강력한 PowerPoint 번역 도구입니다. 이 서비스는 독립 실행형 명령줄 도구와 Amazon Q Developer와 같은 AI 어시스턴트와 통합을 위한 FastMCP(Fast Model Context Protocol) 서비스로 모두 사용할 수 있습니다. 서식과 구조를 보존하면서 PowerPoint 프레젠테이션을 번역합니다.
 
 ## 기능
 
 - **PowerPoint 번역**: PowerPoint 프레젠테이션의 텍스트 콘텐츠 번역
 - **Amazon Bedrock 통합**: 고품질 번역을 위한 Amazon Bedrock 모델 사용
 - **서식 보존**: 원본 서식, 레이아웃 및 스타일 유지
-- **독립형 및 MCP 지원**: 명령줄 도구로 사용하거나 FastMCP를 통해 AI 어시스턴트와 통합
+- **언어별 폰트**: 대상 언어에 적합한 폰트 자동 적용
+- **색상 및 스타일 보존**: 번역되지 않은 콘텐츠에 대해서도 원본 텍스트 색상 및 서식 보존
+- **독립 실행형 및 MCP 지원**: 명령줄 도구로 사용하거나 FastMCP를 통해 AI 어시스턴트와 통합
 - **다국어 지원**: 다양한 언어 간 번역 지원
 - **배치 처리**: 여러 슬라이드와 텍스트 요소를 효율적으로 처리
 - **선택적 번역**: 전체 프레젠테이션 또는 특정 슬라이드 번역
@@ -16,7 +18,7 @@ Amazon Bedrock 모델을 활용하여 고품질 번역을 제공하는 강력한
 
 ### 번역
 
-PowerPoint 번역기는 원본 서식을 유지하면서 콘텐츠를 정확하게 번역합니다:
+PowerPoint 번역기는 원본 서식을 유지하면서 정확하게 콘텐츠를 번역합니다:
 
 <table>
 <tr>
@@ -24,23 +26,18 @@ PowerPoint 번역기는 원본 서식을 유지하면서 콘텐츠를 정확하�
 <td><img src="imgs/translated-ko-complex.png" alt="Korean Example" width="450"/></td>
 </tr>
 <tr>
-<td align="center"><em>복잡한 레이아웃의 <br> 영어 원본 프레젠테이션 슬라이드</em></td>
-<td align="center"><em>서식과 레이아웃이 보존된 <br> 한국어 번역 프레젠테이션</em></td>
+<td align="center"><em>복잡한 레이아웃의 영어 원본 프레젠테이션 슬라이드</em></td>
+<td align="center"><em>서식과 레이아웃이 보존된 한국어 번역 프레젠테이션</em></td>
 </tr>
 </table>
 
 ### Kiro MCP 예시
-
-<details>
-<summary>접기/펼치기</summary>
 
 ![kiro1](imgs/kiro-example1.png)
 
 ![kiro2](imgs/kiro-example2.png)
 
 ![kiro3](imgs/kiro-example3.png)
-
-</details>
 
 ### 사용 예시
 
@@ -50,7 +47,6 @@ uv run python server.py --translate --input-file presentation.pptx --target-lang
 ```
 
 ![standalone](imgs/standalone.png)
-
 
 **특정 슬라이드 번역:**
 ```bash
@@ -63,7 +59,6 @@ uv run python server.py --slide-info --input-file presentation.pptx
 ```
 
 ![get-slideinfo](imgs/get-slideinfo.png)
-
 
 ## 사전 요구사항
 
@@ -110,7 +105,7 @@ uv run python server.py --slide-info --input-file presentation.pptx
    cd ppt-translator
    ```
 
-2. **uv를 사용하여 종속성 설치 (권장)**:
+2. **uv를 사용한 종속성 설치 (권장)**:
    ```bash
    uv sync
    ```
@@ -125,8 +120,8 @@ uv run python server.py --slide-info --input-file presentation.pptx
    cp .env.example .env
    ```
    
-   구성에 맞게 `.env` 파일을 편집하세요:
-   ```
+   구성에 맞게 `.env` 파일 편집:
+   ```bash
    # AWS 구성
    AWS_REGION=us-east-1
    AWS_PROFILE=default
@@ -142,15 +137,26 @@ uv run python server.py --slide-info --input-file presentation.pptx
    BATCH_SIZE=20
    CONTEXT_THRESHOLD=5
    
+   # 언어별 폰트 설정
+   FONT_KOREAN=맑은 고딕
+   FONT_JAPANESE=Yu Gothic UI
+   FONT_ENGLISH=Amazon Ember
+   FONT_CHINESE=Microsoft YaHei
+   FONT_DEFAULT=Arial
+   
    # 디버그 설정
    DEBUG=false
+
+   # 후처리 설정
+   ENABLE_TEXT_AUTOFIT=true
+   TEXT_LENGTH_THRESHOLD=10   
    ```
 
    **참고**: `aws configure`를 사용하여 이미 구성한 경우 `.env` 파일에 AWS 자격 증명(Access Key ID 및 Secret Access Key)이 필요하지 않습니다. 서비스는 AWS CLI 자격 증명을 자동으로 사용합니다.
 
 ## 사용법
 
-### 독립형 명령줄 사용
+### 독립 실행형 명령줄 사용
 
 PowerPoint 번역기는 명령줄에서 직접 사용할 수 있습니다:
 
@@ -177,7 +183,7 @@ python server.py --translate-slides "1,3" --input-file orig.pptx --target-langua
 
 ### FastMCP 서버 모드 (AI 어시스턴트 통합용)
 
-Amazon Q Developer와 같은 AI 어시스턴트와 통합하기 위해 FastMCP 서버를 시작하세요:
+Amazon Q Developer와 같은 AI 어시스턴트와의 통합을 위한 FastMCP 서버 시작:
 
 ```bash
 # uv 사용 (권장)
@@ -205,7 +211,7 @@ Q Developer FastMCP 구성 파일을 생성하거나 업데이트하세요:
 **macOS/Linux**: `~/.aws/amazonq/mcp.json`
 **Windows**: `%APPDATA%\amazonq\mcp.json`
 
-PowerPoint 번역기 FastMCP 서버 구성을 추가하세요:
+PowerPoint 번역기 FastMCP 서버 구성 추가:
 
 **uv 사용**:
 ```json
@@ -259,13 +265,13 @@ PowerPoint 번역기 FastMCP 서버 구성을 추가하세요:
 
 ### 3. FastMCP 서버 확인
 
-FastMCP 서버가 작동하는지 테스트하세요:
+FastMCP 서버가 작동하는지 테스트:
 
 ```bash
 # 프로젝트 디렉토리로 이동
 cd /path/to/ppt-translator
 
-# uv를 사용하여 FastMCP 서버 테스트
+# uv를 사용한 FastMCP 서버 테스트
 uv run python server.py --mcp --test
 
 # 또는 python 직접 사용하여 테스트
@@ -277,7 +283,7 @@ python server.py --mcp --test
 연결되면 다음과 같은 명령을 사용할 수 있습니다 (사용자 입력은 영어일 필요가 없습니다):
 
 ```
-original.pptx를 한국어로 번역해줘
+original.pptx를 한국어로 번역해주세요
 ```
 
 ```
@@ -315,11 +321,11 @@ FastMCP 서버는 다음 도구를 제공합니다:
     - `input_file`: PowerPoint 파일 경로 (.pptx)
     - `slide_number`: 미리보기할 슬라이드 번호 (1부터 시작하는 인덱스)
 
-- **`list_supported_languages`**: 번역 지원 대상 언어 목록 확인
+- **`list_supported_languages`**: 번역에 지원되는 모든 대상 언어 목록
 
-- **`list_supported_models`**: 지원되는 Amazon Bedrock 모델 목록 확인
+- **`list_supported_models`**: 지원되는 모든 Amazon Bedrock 모델 목록
 
-- **`get_translation_help`**: 번역기 사용에 대한 도움말 정보 확인
+- **`get_translation_help`**: 번역기 사용에 대한 도움말 정보
 
 ## 구성
 
@@ -327,7 +333,7 @@ FastMCP 서버는 다음 도구를 제공합니다:
 
 - `AWS_REGION`: Bedrock 서비스용 AWS 리전 (기본값: us-east-1)
 - `AWS_PROFILE`: 사용할 AWS 프로필 (기본값: default)
-- `DEFAULT_TARGET_LANGUAGE`: 번역 기본 대상 언어 (기본값: ko)
+- `DEFAULT_TARGET_LANGUAGE`: 번역의 기본 대상 언어 (기본값: ko)
 - `BEDROCK_MODEL_ID`: 번역용 Bedrock 모델 ID (기본값: us.anthropic.claude-3-7-sonnet-20250219-v1:0)
 - `MAX_TOKENS`: 번역 요청의 최대 토큰 수 (기본값: 4000)
 - `TEMPERATURE`: AI 모델의 온도 설정 (기본값: 0.1)
@@ -363,30 +369,22 @@ FastMCP 서버는 다음 도구를 제공합니다:
    - AWS CLI 구성 확인: `aws configure list`
 
 2. **Bedrock 액세스 거부**:
-   - AWS 계정이 Bedrock에 액세스할 수 있는지 확인
+   - AWS 계정에 Bedrock 액세스 권한이 있는지 확인
    - 지정된 모델이 해당 리전에서 사용 가능한지 확인
 
 3. **FastMCP 연결 문제**:
    - mcp.json의 경로가 올바른지 확인
    - Python과 종속성이 올바르게 설치되어 있는지 확인
-   - Q Developer의 로그에서 오류 메시지 확인
+   - Q Developer의 로그에서 오류 메시지 검토
    - 서버 테스트: `uv run python server.py --mcp --test`
 
 4. **PowerPoint 파일 문제**:
    - 입력 파일이 유효한 PowerPoint (.pptx) 파일인지 확인
-   - 입력 및 출력 경로의 파일 권한 확인
+   - 입력 및 출력 경로 모두에 대한 파일 권한 확인
 
 5. **모듈 가져오기 오류**:
    - 적절한 가상 환경 활성화를 위해 `uv run` 사용
    - 종속성 설치: `uv sync`
-
-### 디버그 모드
-
-디버그 로깅 활성화:
-
-```bash
-uv run python server.py --mcp --debug
-```
 
 ## 개발
 
@@ -394,11 +392,12 @@ uv run python server.py --mcp --debug
 
 ```
 ppt-translator/
-├── server.py              # 메인 서버 진입점 (독립형 및 MCP)
+├── server.py              # 메인 서버 진입점 (독립 실행형 및 MCP)
 ├── fastmcp_server.py      # FastMCP 서버 구현
 ├── ppt_handler.py         # PowerPoint 처리 로직
 ├── translation_engine.py  # 번역 서비스
 ├── bedrock_client.py      # Amazon Bedrock 클라이언트
+├── post_processing.py     # 번역 후처리 유틸리티
 ├── config.py             # 구성 관리
 ├── dependencies.py       # 종속성 관리
 ├── text_utils.py         # 텍스트 처리 유틸리티

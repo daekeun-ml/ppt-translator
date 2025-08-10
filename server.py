@@ -16,6 +16,7 @@ from pathlib import Path
 
 from config import Config
 from ppt_handler import PowerPointTranslator
+from post_processing import PowerPointPostProcessor
 
 # Configure logging
 logging.basicConfig(
@@ -26,7 +27,8 @@ logger = logging.getLogger(__name__)
 
 
 def translate_standalone(input_file: str, target_language: str, output_file: str = None, 
-                        model_id: str = Config.DEFAULT_MODEL_ID, enable_polishing: bool = True):
+                        model_id: str = Config.DEFAULT_MODEL_ID, enable_polishing: bool = True,
+                        config: Config = None):
     """Standalone translation function"""
     try:
         # Validate input file
@@ -37,12 +39,24 @@ def translate_standalone(input_file: str, target_language: str, output_file: str
         # Generate output filename if not provided
         if not output_file:
             input_path = Path(input_file)
-            polishing_suffix = "_polished" if enable_polishing else "_literal"
-            output_file = str(input_path.parent / f"{input_path.stem}_translated_{target_language}{polishing_suffix}{input_path.suffix}")
+            output_file = str(input_path.parent / f"{input_path.stem}_translated_{target_language}{input_path.suffix}")
         
         # Create translator and translate
         translator = PowerPointTranslator(model_id, enable_polishing)
         result = translator.translate_presentation(input_file, output_file, target_language)
+        
+        # Apply post-processing if enabled
+        if config is None:
+            config = Config()
+        if config.get_bool('ENABLE_TEXT_AUTOFIT', True):
+            try:
+                verbose = config.get_bool('DEBUG', False)
+                post_processor = PowerPointPostProcessor(config, verbose=verbose)
+                final_output = post_processor.process_presentation(output_file)
+                print(f"📝 Post-processing applied: Text auto-fitting enabled")
+            except Exception as e:
+                logger.warning(f"Post-processing failed: {e}")
+                print(f"⚠️  Post-processing skipped due to error: {e}")
         
         # Print results
         lang_name = Config.LANGUAGE_MAP.get(target_language, target_language)
@@ -70,7 +84,7 @@ def translate_standalone(input_file: str, target_language: str, output_file: str
 
 def translate_specific_slides_standalone(input_file: str, slide_numbers: str, target_language: str, 
                                         output_file: str = None, model_id: str = Config.DEFAULT_MODEL_ID, 
-                                        enable_polishing: bool = True):
+                                        enable_polishing: bool = True, config: Config = None):
     """Standalone specific slides translation function"""
     try:
         # Validate input file
@@ -97,9 +111,15 @@ def translate_specific_slides_standalone(input_file: str, slide_numbers: str, ta
         # Generate output filename if not provided
         if not output_file:
             input_path = Path(input_file)
-            polishing_suffix = "_polished" if enable_polishing else "_literal"
-            slides_suffix = f"_slides_{'_'.join(map(str, sorted(set(slide_list))))}"
-            output_file = str(input_path.parent / f"{input_path.stem}_translated_{target_language}{slides_suffix}{polishing_suffix}{input_path.suffix}")
+            # Create slides suffix with range format
+            sorted_slides = sorted(set(slide_list))
+            if len(sorted_slides) > 1 and sorted_slides[-1] - sorted_slides[0] == len(sorted_slides) - 1:
+                # Consecutive range
+                slides_suffix = f"_slides_range_{sorted_slides[0]}_{sorted_slides[-1]}"
+            else:
+                # Individual slides or non-consecutive
+                slides_suffix = f"_slides_{'_'.join(map(str, sorted_slides))}"
+            output_file = str(input_path.parent / f"{input_path.stem}_translated_{target_language}{slides_suffix}{input_path.suffix}")
         
         # Create translator and translate specific slides
         translator = PowerPointTranslator(model_id, enable_polishing)
@@ -109,6 +129,19 @@ def translate_specific_slides_standalone(input_file: str, slide_numbers: str, ta
         if result.errors:
             logger.error(f"Translation failed: {'; '.join(result.errors)}")
             return False
+        
+        # Apply post-processing if enabled
+        if config is None:
+            config = Config()
+        if config.get_bool('ENABLE_TEXT_AUTOFIT', True):
+            try:
+                verbose = config.get_bool('DEBUG', False)
+                post_processor = PowerPointPostProcessor(config, verbose=verbose)
+                final_output = post_processor.process_presentation(output_file)
+                print(f"📝 Post-processing applied: Text auto-fitting enabled")
+            except Exception as e:
+                logger.warning(f"Post-processing failed: {e}")
+                print(f"⚠️  Post-processing skipped due to error: {e}")
         
         # Print results
         lang_name = Config.LANGUAGE_MAP.get(target_language, target_language)
@@ -223,11 +256,41 @@ def main():
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument("--test", action="store_true", help="Test FastMCP server")
     
+    # Post-processing options
+    parser.add_argument("--disable-autofit", action="store_true", 
+                       help="Disable text auto-fitting post-processing")
+    parser.add_argument("--text-threshold", type=int, 
+                       help="Text length threshold for auto-fitting (overrides .env setting)")
+    parser.add_argument("--post-process-only", metavar="FILE",
+                       help="Run post-processing only on an existing PowerPoint file")
+    
     args = parser.parse_args()
     
     # Set debug logging
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
+    
+    # Configure post-processing settings from command line
+    config = Config()
+    if args.disable_autofit:
+        config.set('ENABLE_TEXT_AUTOFIT', 'false')
+    if args.text_threshold is not None:
+        config.set('TEXT_LENGTH_THRESHOLD', str(args.text_threshold))
+    if args.debug:
+        config.set('DEBUG', 'true')
+    
+    # Handle post-processing only mode
+    if args.post_process_only:
+        try:
+            verbose = config.get_bool('DEBUG', False)
+            post_processor = PowerPointPostProcessor(config, verbose=verbose)
+            output_file = post_processor.process_presentation(args.post_process_only)
+            print(f"✅ Post-processing completed successfully!")
+            print(f"📁 Output file: {output_file}")
+            sys.exit(0)
+        except Exception as e:
+            logger.error(f"Post-processing failed: {e}")
+            sys.exit(1)
     
     # Handle modes
     if args.translate:
@@ -239,7 +302,8 @@ def main():
             args.target_language,
             args.output_file,
             args.model_id,
-            not args.no_polishing
+            not args.no_polishing,
+            config
         )
         sys.exit(0 if success else 1)
     
@@ -253,7 +317,8 @@ def main():
             args.target_language,
             args.output_file,
             args.model_id,
-            not args.no_polishing
+            not args.no_polishing,
+            config
         )
         sys.exit(0 if success else 1)
     

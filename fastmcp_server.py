@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fastmcp import FastMCP
 from config import Config
 from ppt_handler import PowerPointTranslator
+from post_processing import PowerPointPostProcessor
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -59,17 +60,31 @@ def translate_powerpoint(
         
         # Generate output filename if not provided
         if not output_file:
-            polishing_suffix = "_polished" if enable_polishing else "_literal"
-            output_file = str(input_path.parent / f"{input_path.stem}_translated_{target_language}{polishing_suffix}{input_path.suffix}")
+            output_file = str(input_path.parent / f"{input_path.stem}_translated_{target_language}{input_path.suffix}")
         
         # Create translator and translate
         logger.info(f"Starting translation: {input_file} -> {target_language}")
         translator = PowerPointTranslator(model_id, enable_polishing)
         result = translator.translate_presentation(input_file, output_file, target_language)
         
+        # Apply post-processing if enabled
+        config = Config()
+        post_processing_applied = False
+        if config.get_bool('ENABLE_TEXT_AUTOFIT', True):
+            try:
+                verbose = config.get_bool('DEBUG', False)
+                post_processor = PowerPointPostProcessor(config, verbose=verbose)
+                # Overwrite the original output file instead of creating a new one
+                final_output = post_processor.process_presentation(output_file, output_file)
+                post_processing_applied = True
+                logger.info("Post-processing applied: Text auto-fitting enabled")
+            except Exception as e:
+                logger.warning(f"Post-processing failed: {e}")
+        
         # Format success message
         lang_name = Config.LANGUAGE_MAP.get(target_language, target_language)
         translation_mode = "Natural/Polished" if enable_polishing else "Literal"
+        post_processing_status = "✅ Applied" if post_processing_applied else "⚠️ Skipped"
         
         return f"""✅ PowerPoint translation completed successfully!
 
@@ -81,6 +96,7 @@ def translate_powerpoint(
 📝 Translated texts: {result.translated_count}
 📋 Translated notes: {result.translated_notes_count}
 📊 Total shapes processed: {result.total_shapes}
+🔧 Post-processing: {post_processing_status}
 
 💡 Translation features used:
 • Intelligent batch processing for efficiency
@@ -147,9 +163,15 @@ def translate_specific_slides(
         
         # Generate output filename if not provided
         if not output_file:
-            polishing_suffix = "_polished" if enable_polishing else "_literal"
-            slides_suffix = f"_slides_{'_'.join(map(str, sorted(set(slide_list))))}"
-            output_file = str(input_path.parent / f"{input_path.stem}_translated_{target_language}{slides_suffix}{polishing_suffix}{input_path.suffix}")
+            # Create slides suffix with range format
+            sorted_slides = sorted(set(slide_list))
+            if len(sorted_slides) > 1 and sorted_slides[-1] - sorted_slides[0] == len(sorted_slides) - 1:
+                # Consecutive range
+                slides_suffix = f"_slides_range_{sorted_slides[0]}_{sorted_slides[-1]}"
+            else:
+                # Individual slides or non-consecutive
+                slides_suffix = f"_slides_{'_'.join(map(str, sorted_slides))}"
+            output_file = str(input_path.parent / f"{input_path.stem}_translated_{target_language}{slides_suffix}{input_path.suffix}")
         
         # Create translator and translate specific slides
         logger.info(f"Starting specific slides translation: {input_file} -> {target_language}")
@@ -160,9 +182,24 @@ def translate_specific_slides(
         if result.errors:
             return f"❌ Translation failed: {'; '.join(result.errors)}"
         
+        # Apply post-processing if enabled
+        config = Config()
+        post_processing_applied = False
+        if config.get_bool('ENABLE_TEXT_AUTOFIT', True):
+            try:
+                verbose = config.get_bool('DEBUG', False)
+                post_processor = PowerPointPostProcessor(config, verbose=verbose)
+                # Overwrite the original output file instead of creating a new one
+                final_output = post_processor.process_presentation(output_file, output_file)
+                post_processing_applied = True
+                logger.info("Post-processing applied: Text auto-fitting enabled")
+            except Exception as e:
+                logger.warning(f"Post-processing failed: {e}")
+        
         # Format success message
         lang_name = Config.LANGUAGE_MAP.get(target_language, target_language)
         translation_mode = "Natural/Polished" if enable_polishing else "Literal"
+        post_processing_status = "✅ Applied" if post_processing_applied else "⚠️ Skipped"
         
         return f"""✅ Specific slides translation completed successfully!
 
@@ -175,6 +212,7 @@ def translate_specific_slides(
 📝 Translated texts: {result.translated_count}
 📋 Translated notes: {result.translated_notes_count}
 📊 Total shapes processed: {result.total_shapes}
+🔧 Post-processing: {post_processing_status}
 
 💡 Translation features used:
 • Intelligent batch processing for efficiency
@@ -383,6 +421,77 @@ def get_translation_help() -> str:
 • Individual slides: "1,3,5"
 • Ranges: "2-4" (translates slides 2, 3, 4)
 • Mixed: "1,3-5,8" (translates slides 1, 3, 4, 5, 8)"""
+
+
+@mcp.tool()
+def post_process_powerpoint(
+    input_file: str,
+    output_file: Optional[str] = None,
+    text_threshold: Optional[int] = None,
+    enable_autofit: bool = True
+) -> str:
+    """
+    Apply post-processing to a PowerPoint presentation to optimize text boxes.
+    
+    This function enables text wrapping and shrink text on overflow for text boxes
+    that contain text longer than the specified threshold.
+    
+    Args:
+        input_file: Path to the input PowerPoint file (.pptx)
+        output_file: Path to save the processed file (optional, auto-generated if not provided)
+        text_threshold: Text length threshold for enabling auto-fit (overrides .env setting)
+        enable_autofit: Enable text auto-fitting (default: True)
+    
+    Returns:
+        Success message with post-processing details
+    """
+    try:
+        # Validate input file
+        input_path = Path(input_file)
+        if not input_path.exists():
+            return f"❌ Error: File not found: {input_file}"
+        
+        if not input_path.suffix.lower() == '.pptx':
+            return f"❌ Error: Only .pptx files are supported. Got: {input_path.suffix}"
+        
+        # Create configuration
+        config = Config()
+        if text_threshold is not None:
+            config.set('TEXT_LENGTH_THRESHOLD', str(text_threshold))
+        if not enable_autofit:
+            config.set('ENABLE_TEXT_AUTOFIT', 'false')
+        
+        # Generate output filename if not provided
+        if not output_file:
+            output_file = input_file  # Overwrite the original file
+        
+        # Apply post-processing
+        logger.info(f"Starting post-processing: {input_file}")
+        verbose = config.get_bool('DEBUG', False)
+        post_processor = PowerPointPostProcessor(config, verbose=verbose)
+        final_output = post_processor.process_presentation(input_file, output_file)
+        
+        threshold = config.get_int('TEXT_LENGTH_THRESHOLD', 10)
+        autofit_enabled = config.get_bool('ENABLE_TEXT_AUTOFIT', True)
+        
+        return f"""✅ PowerPoint post-processing completed successfully!
+
+📁 Input file: {input_file}
+📁 Output file: {final_output}
+🔧 Text auto-fitting: {'✅ Enabled' if autofit_enabled else '❌ Disabled'}
+📏 Text length threshold: {threshold} characters
+📝 Processing applied to text boxes longer than {threshold} characters
+
+💡 Post-processing features applied:
+• Text wrapping in shape enabled
+• Shrink text on overflow enabled
+• Text box margins optimized
+• Formatting preservation maintained"""
+        
+    except Exception as e:
+        logger.error(f"Post-processing failed: {str(e)}")
+        return f"❌ Post-processing failed: {str(e)}"
+
 
 if __name__ == "__main__":
     # Run the FastMCP server
