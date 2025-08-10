@@ -101,7 +101,7 @@ The service will automatically use your configured AWS credentials. You can spec
 
 1. **Clone the repository**:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/daekeun-ml/ppt-translator
    cd ppt-translator
    ```
 

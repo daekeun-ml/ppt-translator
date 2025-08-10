@@ -101,7 +101,7 @@ uv run python server.py --slide-info --input-file presentation.pptx
 
 1. **저장소 복제**:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/daekeun-ml/ppt-translator
    cd ppt-translator
    ```
 
