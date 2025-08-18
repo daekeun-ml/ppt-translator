@@ -1,4 +1,5 @@
 # PowerPoint Translator using Amazon Bedrock
+[![smithery badge](https://smithery.ai/badge/@daekeun-ml/ppt-translator)](https://smithery.ai/server/@daekeun-ml/ppt-translator)
 
 A powerful PowerPoint translation tool that leverages Amazon Bedrock models for high-quality translation. This service can be used both as a standalone command-line tool and as a FastMCP (Fast Model Context Protocol) service for integration with AI assistants like Amazon Q Developer. It translates PowerPoint presentations while preserving formatting and structure.
 
@@ -99,6 +100,15 @@ The service will automatically use your configured AWS credentials. You can spec
 
 ## Installation
 
+### Installing via Smithery
+
+To install PowerPoint Translator for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@daekeun-ml/ppt-translator):
+
+```bash
+npx -y @smithery/cli install @daekeun-ml/ppt-translator --client claude
+```
+
+### Manual Installation
 1. **Clone the repository**:
    ```bash
    git clone https://github.com/daekeun-ml/ppt-translator
@@ -128,7 +138,7 @@ The service will automatically use your configured AWS credentials. You can spec
    
    # Translation Configuration
    DEFAULT_TARGET_LANGUAGE=ko
-   BEDROCK_MODEL_ID=us.anthropic.claude-3-7-sonnet-20250219-v1:0
+   BEDROCK_MODEL_ID=us.anthropic.claude-3-7-sonnet-20250219-v1
    
    # Translation Settings
    MAX_TOKENS=4000
@@ -223,7 +233,7 @@ Add the PowerPoint Translator FastMCP server configuration:
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default",
-        "BEDROCK_MODEL_ID": "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+        "BEDROCK_MODEL_ID": "us.anthropic.claude-3-7-sonnet-20250219-v1"
       },
       "disabled": false,
       "autoApprove": [
@@ -247,7 +257,7 @@ Add the PowerPoint Translator FastMCP server configuration:
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default",
-        "BEDROCK_MODEL_ID": "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+        "BEDROCK_MODEL_ID": "us.anthropic.claude-3-7-sonnet-20250219-v1"
       },
       "disabled": false,
       "autoApprove": [
@@ -335,7 +345,7 @@ The FastMCP server provides the following tools:
 - `AWS_REGION`: AWS region for Bedrock service (default: us-east-1)
 - `AWS_PROFILE`: AWS profile to use (default: default)
 - `DEFAULT_TARGET_LANGUAGE`: Default target language for translation (default: ko)
-- `BEDROCK_MODEL_ID`: Bedrock model ID for translation (default: us.anthropic.claude-3-7-sonnet-20250219-v1:0)
+- `BEDROCK_MODEL_ID`: Bedrock model ID for translation (default: us.anthropic.claude-3-7-sonnet:20250219-v1:0)
 - `MAX_TOKENS`: Maximum tokens for translation requests (default: 4000)
 - `TEMPERATURE`: Temperature setting for AI model (default: 0.1)
 - `ENABLE_POLISHING`: Enable translation polishing (default: true)
