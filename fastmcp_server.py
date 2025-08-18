@@ -493,6 +493,10 @@ def post_process_powerpoint(
         return f"❌ Post-processing failed: {str(e)}"
 
 
-if __name__ == "__main__":
+def main():
+    """Main entry point for the FastMCP server."""
     # Run the FastMCP server
     mcp.run()
+
+if __name__ == "__main__":
+    main()
