@@ -17,7 +17,13 @@ class PromptGenerator:
 - Keep company names, person names, and product names untranslated  
 - Keep technical terms that are commonly used in English (API, SDK, CLI, etc.)
 - Keep time expressions, currency amounts, and numbers untranslated
-- Preserve formatting markers (bullets, numbers, etc.)"""
+- Preserve formatting markers (bullets, numbers, etc.)
+
+TRANSLATION REQUIREMENTS:
+- ALWAYS translate Japanese katakana words (e.g., カタカナ) to the target language
+- ALWAYS translate short text fragments, even if they are only 2-5 characters
+- Do NOT skip translation of any text based on length or format
+"""
     
     @staticmethod
     def _get_polishing_instruction(enable_polishing: bool) -> str:
