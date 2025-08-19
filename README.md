@@ -213,31 +213,6 @@ Create or update your Q Developer FastMCP configuration file:
 
 Add the PowerPoint Translator FastMCP server configuration:
 
-**Using uv**:
-```json
-{
-  "mcpServers": {
-    "ppt-translator": {
-      "command": "uv",
-      "args": ["run", "/path/to/ppt-translator/fastmcp_server.py"],
-      "env": {
-        "AWS_REGION": "us-east-1",
-        "AWS_PROFILE": "default",
-        "BEDROCK_MODEL_ID": "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
-      },
-      "disabled": false,
-      "autoApprove": [
-        "translate_powerpoint",
-        "get_slide_info",
-        "get_slide_preview",
-        "translate_specific_slides"
-      ]
-    }
-  }
-}
-```
-
-**Alternative configuration using python directly**:
 ```json
 {
   "mcpServers": {
