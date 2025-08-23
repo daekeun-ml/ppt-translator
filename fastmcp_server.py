@@ -23,6 +23,50 @@ logger = logging.getLogger(__name__)
 # Initialize FastMCP server
 mcp = FastMCP("PowerPoint Translator")
 
+def validate_input_path(input_file: str) -> tuple[Path, str]:
+    """
+    Validate input file path, handling both absolute and relative paths.
+    
+    Args:
+        input_file: Input file path (absolute or relative)
+    
+    Returns:
+        Tuple of (validated_path, error_message). If error_message is not empty, path validation failed.
+    """
+    input_path = Path(input_file)
+    
+    # If it's a relative path, try to resolve it from current working directory
+    if not input_path.is_absolute():
+        # Try current working directory first
+        cwd_path = Path.cwd() / input_file
+        if cwd_path.exists():
+            input_path = cwd_path
+        else:
+            # Try the script's directory as fallback
+            script_dir = Path(__file__).parent
+            script_path = script_dir / input_file
+            if script_path.exists():
+                input_path = script_path
+    
+    if not input_path.exists():
+        # Provide more helpful error message with current working directory info
+        cwd = Path.cwd()
+        script_dir = Path(__file__).parent
+        error_msg = f"""❌ Error: File not found: {input_file}
+📁 Current working directory: {cwd}
+📁 Script directory: {script_dir}
+💡 Tried paths:
+   • {input_file} (as provided)
+   • {cwd / input_file} (from current directory)
+   • {script_dir / input_file} (from script directory)
+💡 Try using absolute path or ensure file is in one of these directories"""
+        return input_path, error_msg
+    
+    if not input_path.suffix.lower() == '.pptx':
+        return input_path, f"❌ Error: File must be a PowerPoint (.pptx) file: {input_file}"
+    
+    return input_path, ""
+
 @mcp.tool()
 def translate_powerpoint(
     input_file: str,
@@ -45,13 +89,10 @@ def translate_powerpoint(
         Success message with translation details
     """
     try:
-        # Validate input file
-        input_path = Path(input_file)
-        if not input_path.exists():
-            return f"❌ Error: File not found: {input_file}"
-        
-        if not input_path.suffix.lower() == '.pptx':
-            return f"❌ Error: File must be a PowerPoint (.pptx) file: {input_file}"
+        # Validate input file using helper function
+        input_path, error_msg = validate_input_path(input_file)
+        if error_msg:
+            return error_msg
         
         # Validate target language
         if target_language not in Config.LANGUAGE_MAP:
@@ -63,9 +104,9 @@ def translate_powerpoint(
             output_file = str(input_path.parent / f"{input_path.stem}_translated_{target_language}{input_path.suffix}")
         
         # Create translator and translate
-        logger.info(f"Starting translation: {input_file} -> {target_language}")
+        logger.info(f"Starting translation: {input_path} -> {target_language}")
         translator = PowerPointTranslator(model_id, enable_polishing)
-        result = translator.translate_presentation(input_file, output_file, target_language)
+        result = translator.translate_presentation(str(input_path), output_file, target_language)
         
         # Apply post-processing if enabled
         config = Config()
@@ -88,7 +129,7 @@ def translate_powerpoint(
         
         return f"""✅ PowerPoint translation completed successfully!
 
-📁 Input file: {input_file}
+📁 Input file: {input_path}
 📁 Output file: {output_file}
 🌐 Target language: {target_language} ({lang_name})
 🎨 Translation mode: {translation_mode}
@@ -133,13 +174,10 @@ def translate_specific_slides(
         Success message with translation details
     """
     try:
-        # Validate input file
-        input_path = Path(input_file)
-        if not input_path.exists():
-            return f"❌ Error: File not found: {input_file}"
-        
-        if not input_path.suffix.lower() == '.pptx':
-            return f"❌ Error: File must be a PowerPoint (.pptx) file: {input_file}"
+        # Validate input file using helper function
+        input_path, error_msg = validate_input_path(input_file)
+        if error_msg:
+            return error_msg
         
         # Validate target language
         if target_language not in Config.LANGUAGE_MAP:
@@ -174,9 +212,9 @@ def translate_specific_slides(
             output_file = str(input_path.parent / f"{input_path.stem}_translated_{target_language}{slides_suffix}{input_path.suffix}")
         
         # Create translator and translate specific slides
-        logger.info(f"Starting specific slides translation: {input_file} -> {target_language}")
+        logger.info(f"Starting specific slides translation: {input_path} -> {target_language}")
         translator = PowerPointTranslator(model_id, enable_polishing)
-        result = translator.translate_specific_slides(input_file, output_file, target_language, slide_list)
+        result = translator.translate_specific_slides(str(input_path), output_file, target_language, slide_list)
         
         # Check for errors
         if result.errors:
@@ -203,7 +241,7 @@ def translate_specific_slides(
         
         return f"""✅ Specific slides translation completed successfully!
 
-📁 Input file: {input_file}
+📁 Input file: {input_path}
 📁 Output file: {output_file}
 📄 Translated slides: {sorted(set(slide_list))}
 🌐 Target language: {target_language} ({lang_name})
@@ -237,21 +275,18 @@ def get_slide_info(input_file: str) -> str:
         Information about the presentation including slide count and preview of each slide
     """
     try:
-        # Validate input file
-        input_path = Path(input_file)
-        if not input_path.exists():
-            return f"❌ Error: File not found: {input_file}"
-        
-        if not input_path.suffix.lower() == '.pptx':
-            return f"❌ Error: File must be a PowerPoint (.pptx) file: {input_file}"
+        # Validate input file using helper function
+        input_path, error_msg = validate_input_path(input_file)
+        if error_msg:
+            return error_msg
         
         # Create translator to access slide info methods
         translator = PowerPointTranslator()
-        slide_count = translator.get_slide_count(input_file)
+        slide_count = translator.get_slide_count(str(input_path))
         
         info_text = f"""📊 PowerPoint Presentation Information
 
-📁 File: {input_file}
+📁 File: {input_path}
 📄 Total slides: {slide_count}
 
 📋 Slide previews:
@@ -261,7 +296,7 @@ def get_slide_info(input_file: str) -> str:
         max_preview_slides = min(slide_count, 10)
         for i in range(1, max_preview_slides + 1):
             try:
-                preview = translator.get_slide_preview(input_file, i, max_chars=150)
+                preview = translator.get_slide_preview(str(input_path), i, max_chars=150)
                 info_text += f"\n🔸 Slide {i}: {preview}"
             except Exception as e:
                 info_text += f"\n🔸 Slide {i}: [Error getting preview: {str(e)}]"
@@ -295,26 +330,23 @@ def get_slide_preview(input_file: str, slide_number: int) -> str:
         Detailed preview of the slide content
     """
     try:
-        # Validate input file
-        input_path = Path(input_file)
-        if not input_path.exists():
-            return f"❌ Error: File not found: {input_file}"
-        
-        if not input_path.suffix.lower() == '.pptx':
-            return f"❌ Error: File must be a PowerPoint (.pptx) file: {input_file}"
+        # Validate input file using helper function
+        input_path, error_msg = validate_input_path(input_file)
+        if error_msg:
+            return error_msg
         
         # Create translator and get preview
         translator = PowerPointTranslator()
-        slide_count = translator.get_slide_count(input_file)
+        slide_count = translator.get_slide_count(str(input_path))
         
         if slide_number < 1 or slide_number > slide_count:
             return f"❌ Error: Invalid slide number {slide_number}. Valid range: 1-{slide_count}"
         
-        preview = translator.get_slide_preview(input_file, slide_number, max_chars=500)
+        preview = translator.get_slide_preview(str(input_path), slide_number, max_chars=500)
         
         return f"""📄 Slide {slide_number} Preview
 
-📁 File: {input_file}
+📁 File: {input_path}
 📊 Total slides: {slide_count}
 
 📝 Content preview:
@@ -354,6 +386,7 @@ def list_supported_models() -> str:
         models_text += f"• {model}\n"
     
     return models_text
+
 
 @mcp.tool()
 def get_translation_help() -> str:
@@ -446,13 +479,10 @@ def post_process_powerpoint(
         Success message with post-processing details
     """
     try:
-        # Validate input file
-        input_path = Path(input_file)
-        if not input_path.exists():
-            return f"❌ Error: File not found: {input_file}"
-        
-        if not input_path.suffix.lower() == '.pptx':
-            return f"❌ Error: Only .pptx files are supported. Got: {input_path.suffix}"
+        # Validate input file using helper function
+        input_path, error_msg = validate_input_path(input_file)
+        if error_msg:
+            return error_msg
         
         # Create configuration
         config = Config()
@@ -463,20 +493,20 @@ def post_process_powerpoint(
         
         # Generate output filename if not provided
         if not output_file:
-            output_file = input_file  # Overwrite the original file
+            output_file = str(input_path)  # Overwrite the original file
         
         # Apply post-processing
-        logger.info(f"Starting post-processing: {input_file}")
+        logger.info(f"Starting post-processing: {input_path}")
         verbose = config.get_bool('DEBUG', False)
         post_processor = PowerPointPostProcessor(config, verbose=verbose)
-        final_output = post_processor.process_presentation(input_file, output_file)
+        final_output = post_processor.process_presentation(str(input_path), output_file)
         
         threshold = config.get_int('TEXT_LENGTH_THRESHOLD', 10)
         autofit_enabled = config.get_bool('ENABLE_TEXT_AUTOFIT', True)
         
         return f"""✅ PowerPoint post-processing completed successfully!
 
-📁 Input file: {input_file}
+📁 Input file: {input_path}
 📁 Output file: {final_output}
 🔧 Text auto-fitting: {'✅ Enabled' if autofit_enabled else '❌ Disabled'}
 📏 Text length threshold: {threshold} characters

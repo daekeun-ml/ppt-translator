@@ -3,7 +3,7 @@ startCommand:
   commandFunction:
     # A JS function that produces the CLI command based on the given config to start the MCP on stdio.
     |-
-    (config) => ({ command: 'uv', args: ['run', 'fastmcp_server.py'] })
+    (config) => ({ command: 'uv', args: ['run', 'main.py'] })
   configSchema:
     # JSON Schema defining the configuration options for the MCP.
     type: object
