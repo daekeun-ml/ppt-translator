@@ -1,4 +1,5 @@
-python-pptx
-boto3
-python-dotenv
-fastmcp
+python-pptx>=1.0.2
+boto3>=1.40.21
+fastmcp>=2.11.3
+python-dotenv>=1.1.1
+python-pptx>=1.0.2

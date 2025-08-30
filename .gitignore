@@ -1,6 +1,3 @@
-# Environment variables
-.env
-
 # Python
 __pycache__/
 *.py[cod]
@@ -47,9 +44,6 @@ yarn-error.log
 # Test files
 test_output/
 *.test.*
-
-# Environment 
-.env
 
 # Macbook tmp files
 .DS_Store

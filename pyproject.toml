@@ -1,12 +1,23 @@
 [project]
 name = "ppt-translator"
-version = "0.1.0"
-description = "Add your description here"
+version = "1.0.4"
+description = "PowerPoint Translator using Amazon Bedrock"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "boto3>=1.40.1",
-    "fastmcp>=2.11.0",
+    "boto3>=1.40.21",
+    "click>=8.2.1",
+    "fastmcp>=2.11.3",
     "python-dotenv>=1.1.1",
     "python-pptx>=1.0.2",
 ]
+
+[project.scripts]
+ppt-translate = "ppt_translator.cli:cli"
+
+[tool.setuptools.packages.find]
+include = ["ppt_translator*"]
+
+[build-system]
+requires = ["setuptools>=80.0", "wheel"]
+build-backend = "setuptools.build_meta"

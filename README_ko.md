@@ -1,37 +1,37 @@
-# Amazon Bedrock을 활용한 PowerPoint 번역기
+# Amazon Bedrock을 사용한 PowerPoint 번역기
 
-Amazon Bedrock 모델을 활용하여 고품질 번역을 제공하는 강력한 PowerPoint 번역 도구입니다. 이 서비스는 독립 실행형 명령줄 도구와 Amazon Q Developer와 같은 AI 어시스턴트와 통합을 위한 FastMCP(Fast Model Context Protocol) 서비스로 모두 사용할 수 있습니다. 서식과 구조를 보존하면서 PowerPoint 프레젠테이션을 번역합니다.
+Amazon Bedrock 모델을 활용하여 고품질 번역을 제공하는 강력한 PowerPoint 번역 도구입니다. 이 서비스는 독립 실행형 명령줄 도구로 사용하거나 Amazon Q Developer와 같은 AI 어시스턴트와 통합하기 위한 FastMCP(Fast Model Context Protocol) 서비스로 사용할 수 있습니다. 서식과 구조를 유지하면서 PowerPoint 프레젠테이션을 번역합니다.
 
 ## 기능
 
-- **PowerPoint 번역**: PowerPoint 프레젠테이션의 텍스트 콘텐츠 번역
+- **PowerPoint 번역**: PowerPoint 프레젠테이션의 텍스트 내용 번역
 - **Amazon Bedrock 통합**: 고품질 번역을 위한 Amazon Bedrock 모델 사용
 - **서식 보존**: 원본 서식, 레이아웃 및 스타일 유지
 - **언어별 폰트**: 대상 언어에 적합한 폰트 자동 적용
-- **색상 및 스타일 보존**: 번역되지 않은 콘텐츠에 대해서도 원본 텍스트 색상 및 서식 보존
+- **색상 및 스타일 보존**: 번역되지 않은 내용도 원본 텍스트 색상과 서식 유지
 - **독립 실행형 및 MCP 지원**: 명령줄 도구로 사용하거나 FastMCP를 통해 AI 어시스턴트와 통합
 - **다국어 지원**: 다양한 언어 간 번역 지원
 - **배치 처리**: 여러 슬라이드와 텍스트 요소를 효율적으로 처리
 - **선택적 번역**: 전체 프레젠테이션 또는 특정 슬라이드 번역
 
-## 예시
+## 예제
 
 ### 번역
 
-PowerPoint 번역기는 원본 서식을 유지하면서 정확하게 콘텐츠를 번역합니다:
+PowerPoint 번역기는 원본 서식을 유지하면서 정확하게 내용을 번역합니다:
 
 <table>
 <tr>
 <td><img src="imgs/original-en-complex.png" alt="English" width="450"/></td>
-<td><img src="imgs/translated-ko-complex.png" alt="Korean Example" width="450"/></td>
+<td><img src="imgs/translated-ko-complex.png" alt="Korean" width="450"/></td>
 </tr>
 <tr>
 <td align="center"><em>복잡한 레이아웃의 영어 원본 프레젠테이션 슬라이드</em></td>
-<td align="center"><em>서식과 레이아웃이 보존된 한국어 번역 프레젠테이션</em></td>
+<td align="center"><em>서식과 레이아웃이 보존된 한국어 번역본</em></td>
 </tr>
 </table>
 
-### Kiro MCP 예시
+### Kiro MCP 예제
 
 ![kiro1](imgs/kiro-example1.png)
 
@@ -39,23 +39,23 @@ PowerPoint 번역기는 원본 서식을 유지하면서 정확하게 콘텐츠�
 
 ![kiro3](imgs/kiro-example3.png)
 
-### 사용 예시
+### 사용 예제
 
 **전체 프레젠테이션 번역:**
 ```bash
-uv run python server.py --translate --input-file presentation.pptx --target-language ko
+uv run ppt-translate translate presentation.pptx --target-language ko
 ```
 
 ![standalone](imgs/standalone.png)
 
 **특정 슬라이드 번역:**
 ```bash
-uv run python server.py --translate-slides "1,3,5" --input-file presentation.pptx --target-language ja
+uv run ppt-translate translate-slides presentation.pptx --slides "1,3,5" --target-language ja
 ```
 
 **슬라이드 정보 확인:**
 ```bash
-uv run python server.py --slide-info --input-file presentation.pptx
+uv run ppt-translate info presentation.pptx
 ```
 
 ![get-slideinfo](imgs/get-slideinfo.png)
@@ -105,7 +105,7 @@ uv run python server.py --slide-info --input-file presentation.pptx
    cd ppt-translator
    ```
 
-2. **uv를 사용한 종속성 설치 (권장)**:
+2. **uv를 사용한 의존성 설치 (권장)**:
    ```bash
    uv sync
    ```
@@ -149,7 +149,7 @@ uv run python server.py --slide-info --input-file presentation.pptx
 
    # 후처리 설정
    ENABLE_TEXT_AUTOFIT=true
-   TEXT_LENGTH_THRESHOLD=10   
+   TEXT_LENGTH_THRESHOLD=10
    ```
 
    **참고**: `aws configure`를 사용하여 이미 구성한 경우 `.env` 파일에 AWS 자격 증명(Access Key ID 및 Secret Access Key)이 필요하지 않습니다. 서비스는 AWS CLI 자격 증명을 자동으로 사용합니다.
@@ -158,39 +158,40 @@ uv run python server.py --slide-info --input-file presentation.pptx
 
 ### 독립 실행형 명령줄 사용
 
-PowerPoint 번역기는 명령줄에서 직접 사용할 수 있습니다:
+PowerPoint 번역기는 `ppt-translate` 명령을 사용하여 명령줄에서 직접 사용할 수 있습니다:
 
 ```bash
 # 전체 프레젠테이션을 한국어로 번역
-uv run python server.py --translate --input-file orig.pptx --target-language ko
+uv run ppt-translate translate samples/en.pptx --target-language ko
 
 # 특정 슬라이드 번역 (개별 슬라이드)
-uv run python server.py --translate-slides "1,3,5" --input-file orig.pptx --target-language ko
+uv run ppt-translate translate-slides samples/en.pptx --slides "1,3" --target-language ko
 
 # 슬라이드 범위 번역
-uv run python server.py --translate-slides "2-4" --input-file orig.pptx --target-language ko
+uv run ppt-translate translate-slides samples/en.pptx --slides "2-4" --target-language ko
 
 # 혼합 번역 (개별 + 범위)
-uv run python server.py --translate-slides "1,3-5,8" --input-file orig.pptx --target-language ko
+uv run ppt-translate translate-slides samples/en.pptx --slides "1,2-4" --target-language ko
 
 # 슬라이드 정보 및 미리보기 확인
-uv run python server.py --slide-info --input-file orig.pptx
+uv run ppt-translate info samples/en.pptx
 
-# python 직접 사용
-python server.py --translate --input-file orig.pptx --target-language ko
-python server.py --translate-slides "1,3" --input-file orig.pptx --target-language ko
+# 도움말 표시
+uv run ppt-translate --help
+uv run ppt-translate translate --help
+uv run ppt-translate translate-slides --help
 ```
 
 ### FastMCP 서버 모드 (AI 어시스턴트 통합용)
 
-Amazon Q Developer와 같은 AI 어시스턴트와의 통합을 위한 FastMCP 서버 시작:
+Amazon Q Developer와 같은 AI 어시스턴트와 통합하기 위한 FastMCP 서버 시작:
 
 ```bash
 # uv 사용 (권장)
-uv run python server.py --mcp
+uv run mcp_server.py
 
 # python 직접 사용
-python server.py --mcp
+python mcp_server.py
 ```
 
 ## FastMCP 설정 (Amazon Q Developer 및 Kiro)
@@ -205,7 +206,7 @@ Amazon Q Developer 또는 Kiro를 아직 설치하지 않았다면 다음을 참
 Q Developer FastMCP 구성 파일을 생성하거나 업데이트하세요:
 
 #### Kiro
-**사용자 수준** `~/.kiro/settings/mcp.json`
+**사용자 레벨** `~/.kiro/settings/mcp.json`
 
 #### Amazon Q Developer
 **macOS/Linux**: `~/.aws/amazonq/mcp.json`
@@ -219,7 +220,7 @@ PowerPoint 번역기 FastMCP 서버 구성 추가:
   "mcpServers": {
     "ppt-translator": {
       "command": "uv",
-      "args": ["run", "/path/to/ppt-translator/fastmcp_server.py"],
+      "args": ["run", "/path/to/ppt-translator/mcp_server.py"],
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default",
@@ -243,7 +244,7 @@ PowerPoint 번역기 FastMCP 서버 구성 추가:
   "mcpServers": {
     "ppt-translator": {
       "command": "python",
-      "args": ["/path/to/ppt-translator/fastmcp_server.py"],
+      "args": ["/path/to/ppt-translator/mcp_server.py"],
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default",
@@ -263,36 +264,17 @@ PowerPoint 번역기 FastMCP 서버 구성 추가:
 
 **중요**: `/path/to/ppt-translator/`를 복제한 저장소의 실제 경로로 바꾸세요.
 
-### 3. FastMCP 서버 확인
-
-FastMCP 서버가 작동하는지 테스트:
-
-```bash
-# 프로젝트 디렉토리로 이동
-cd /path/to/ppt-translator
-
-# uv를 사용한 FastMCP 서버 테스트
-uv run python server.py --mcp --test
-
-# 또는 python 직접 사용하여 테스트
-python server.py --mcp --test
-```
-
-### 4. PowerPoint 번역 사용
+### 3. PowerPoint 번역 사용
 
 연결되면 다음과 같은 명령을 사용할 수 있습니다 (사용자 입력은 영어일 필요가 없습니다):
 
 ```
-original.pptx를 한국어로 번역해주세요
+original.pptx의 10번부터 13번 슬라이드를 한국어로 번역해주세요.
 ```
 
-```
-original.pptx의 10번부터 13번 슬라이드를 일본어로 번역해주세요.
-```
+## 사용 가능한 MCP 도구
 
-## 사용 가능한 FastMCP 도구
-
-FastMCP 서버는 다음 도구를 제공합니다:
+MCP 서버는 다음 도구를 제공합니다:
 
 - **`translate_powerpoint`**: 전체 PowerPoint 프레젠테이션 번역
   - 매개변수:
@@ -314,14 +296,14 @@ FastMCP 서버는 다음 도구를 제공합니다:
 - **`get_slide_info`**: PowerPoint 프레젠테이션의 슬라이드 정보 확인
   - 매개변수:
     - `input_file`: PowerPoint 파일 경로 (.pptx)
-  - 반환값: 슬라이드 수와 각 슬라이드 콘텐츠 미리보기가 포함된 개요
+  - 반환값: 슬라이드 수와 각 슬라이드 내용 미리보기가 포함된 개요
 
-- **`get_slide_preview`**: 특정 슬라이드 콘텐츠의 상세 미리보기 확인
+- **`get_slide_preview`**: 특정 슬라이드 내용의 상세 미리보기
   - 매개변수:
     - `input_file`: PowerPoint 파일 경로 (.pptx)
-    - `slide_number`: 미리보기할 슬라이드 번호 (1부터 시작하는 인덱스)
+    - `slide_number`: 미리보기할 슬라이드 번호 (1부터 시작)
 
-- **`list_supported_languages`**: 번역에 지원되는 모든 대상 언어 목록
+- **`list_supported_languages`**: 번역 지원 대상 언어 목록
 
 - **`list_supported_models`**: 지원되는 모든 Amazon Bedrock 모델 목록
 
@@ -333,13 +315,13 @@ FastMCP 서버는 다음 도구를 제공합니다:
 
 - `AWS_REGION`: Bedrock 서비스용 AWS 리전 (기본값: us-east-1)
 - `AWS_PROFILE`: 사용할 AWS 프로필 (기본값: default)
-- `DEFAULT_TARGET_LANGUAGE`: 번역의 기본 대상 언어 (기본값: ko)
+- `DEFAULT_TARGET_LANGUAGE`: 번역 기본 대상 언어 (기본값: ko)
 - `BEDROCK_MODEL_ID`: 번역용 Bedrock 모델 ID (기본값: us.anthropic.claude-3-7-sonnet-20250219-v1:0)
-- `MAX_TOKENS`: 번역 요청의 최대 토큰 수 (기본값: 4000)
-- `TEMPERATURE`: AI 모델의 온도 설정 (기본값: 0.1)
+- `MAX_TOKENS`: 번역 요청 최대 토큰 수 (기본값: 4000)
+- `TEMPERATURE`: AI 모델 온도 설정 (기본값: 0.1)
 - `ENABLE_POLISHING`: 번역 다듬기 활성화 (기본값: true)
-- `BATCH_SIZE`: 배치에서 처리할 텍스트 수 (기본값: 20)
-- `CONTEXT_THRESHOLD`: 컨텍스트 인식 번역을 트리거하는 텍스트 수 (기본값: 5)
+- `BATCH_SIZE`: 배치로 처리할 텍스트 수 (기본값: 20)
+- `CONTEXT_THRESHOLD`: 컨텍스트 인식 번역을 트리거할 텍스트 수 (기본값: 5)
 - `DEBUG`: 디버그 로깅 활성화 (기본값: false)
 
 ### 지원 언어
@@ -358,7 +340,7 @@ FastMCP 서버는 다음 도구를 제공합니다:
 - 러시아어 (ru)
 - 아랍어 (ar)
 - 힌디어 (hi)
-- 그리고 더 많은 언어들...
+- 그 외 다수...
 
 ## 문제 해결
 
@@ -374,17 +356,17 @@ FastMCP 서버는 다음 도구를 제공합니다:
 
 3. **FastMCP 연결 문제**:
    - mcp.json의 경로가 올바른지 확인
-   - Python과 종속성이 올바르게 설치되어 있는지 확인
-   - Q Developer의 로그에서 오류 메시지 검토
-   - 서버 테스트: `uv run python server.py --mcp --test`
+   - Python과 의존성이 올바르게 설치되어 있는지 확인
+   - Q Developer의 로그에서 오류 메시지 확인
+   - 서버 테스트: `uv run python mcp_server.py`
 
 4. **PowerPoint 파일 문제**:
    - 입력 파일이 유효한 PowerPoint (.pptx) 파일인지 확인
-   - 입력 및 출력 경로 모두에 대한 파일 권한 확인
+   - 입력 및 출력 경로의 파일 권한 확인
 
 5. **모듈 가져오기 오류**:
    - 적절한 가상 환경 활성화를 위해 `uv run` 사용
-   - 종속성 설치: `uv sync`
+   - 의존성 설치: `uv sync`
 
 ## 개발
 
@@ -392,40 +374,27 @@ FastMCP 서버는 다음 도구를 제공합니다:
 
 ```
 ppt-translator/
-├── server.py              # 메인 서버 진입점 (독립 실행형 및 MCP)
-├── fastmcp_server.py      # FastMCP 서버 구현
-├── ppt_handler.py         # PowerPoint 처리 로직
-├── translation_engine.py  # 번역 서비스
-├── bedrock_client.py      # Amazon Bedrock 클라이언트
-├── post_processing.py     # 번역 후처리 유틸리티
-├── config.py             # 구성 관리
-├── dependencies.py       # 종속성 관리
-├── text_utils.py         # 텍스트 처리 유틸리티
-├── prompts.py            # 번역 프롬프트
-├── requirements.txt      # Python 종속성
-├── pyproject.toml        # 프로젝트 구성 (uv)
-└── imgs/                 # 예시 이미지 및 스크린샷
-```
-
-### 개발을 위한 uv 사용
-
-이 프로젝트는 종속성 관리를 위해 `uv`를 사용합니다:
-
-```bash
-# 종속성 설치
-uv sync
-
-# 서버 실행
-uv run python server.py --mcp
-
-# 테스트 실행
-uv run python server.py --mcp --test
-
-# 새 종속성 추가
-uv add package-name
-
-# 종속성 업데이트
-uv sync --upgrade
+├── mcp_server.py                    # FastMCP 서버 구현
+├── main.py                          # 메인 진입점
+├── ppt_translator/                  # 핵심 패키지
+│   ├── __init__.py                  # 패키지 초기화
+│   ├── cli.py                       # 명령줄 인터페이스
+│   ├── ppt_handler.py               # PowerPoint 처리 로직
+│   ├── translation_engine.py        # 번역 서비스
+│   ├── bedrock_client.py            # Amazon Bedrock 클라이언트
+│   ├── post_processing.py           # 후처리 유틸리티
+│   ├── config.py                    # 설정 관리
+│   ├── dependencies.py              # 의존성 관리
+│   ├── text_utils.py                # 텍스트 처리 유틸리티
+│   └── prompts.py                   # 번역 프롬프트
+├── requirements.txt                 # Python 의존성
+├── pyproject.toml                   # 프로젝트 설정 (uv)
+├── uv.lock                          # 의존성 잠금 파일
+├── .env.example                     # 환경 변수 템플릿
+├── Dockerfile                       # Docker 설정
+├── docs/                            # 문서
+├── imgs/                            # 예제 이미지 및 스크린샷
+└── samples/                         # 샘플 파일
 ```
 
 ## 라이선스

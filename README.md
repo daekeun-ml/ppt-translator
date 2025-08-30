@@ -23,7 +23,7 @@ The PowerPoint Translator maintains the original formatting while accurately tra
 <table>
 <tr>
 <td><img src="imgs/original-en-complex.png" alt="English" width="450"/></td>
-<td><img src="imgs/translated-ko-complex.png" alt="Korean Example" width="450"/></td>
+<td><img src="imgs/translated-ko-complex.png" alt="Korean" width="450"/></td>
 </tr>
 <tr>
 <td align="center"><em>Original presentation slide in English <br> with complex layout</em></td>
@@ -116,10 +116,6 @@ The service will automatically use your configured AWS credentials. You can spec
    ```
 
 3. **Set up environment variables**:
-   ```bash
-   cp .env.example .env
-   ```
-   
    Edit `.env` file with your configuration:
    ```bash
    # AWS Configuration
@@ -158,27 +154,28 @@ The service will automatically use your configured AWS credentials. You can spec
 
 ### Standalone Command-Line Usage
 
-The PowerPoint Translator can be used directly from the command line:
+The PowerPoint Translator can be used directly from the command line using the `ppt-translate` command:
 
 ```bash
 # Translate entire presentation to Korean
-uv run python server.py --translate --input-file orig.pptx --target-language ko
+uv run ppt-translate translate samples/en.pptx --target-language ko
 
 # Translate specific slides (individual slides)
-uv run python server.py --translate-slides "1,3,5" --input-file orig.pptx --target-language ko
+uv run ppt-translate translate-slides samples/en.pptx --slides "1,3" --target-language ko
 
 # Translate slide range
-uv run python server.py --translate-slides "2-4" --input-file orig.pptx --target-language ko
+uv run ppt-translate translate-slides samples/en.pptx --slides "2-4" --target-language ko
 
 # Translate mixed (individual + range)
-uv run python server.py --translate-slides "1,3-5,8" --input-file orig.pptx --target-language ko
+uv run ppt-translate translate-slides samples/en.pptx --slides "1,2-4" --target-language ko
 
 # Get slide information and previews
-uv run python server.py --slide-info --input-file orig.pptx
+uv run ppt-translate info samples/en.pptx
 
-# Using python directly
-python server.py --translate --input-file orig.pptx --target-language ko
-python server.py --translate-slides "1,3" --input-file orig.pptx --target-language ko
+# Show help
+uv run ppt-translate --help
+uv run ppt-translate translate --help
+uv run ppt-translate translate-slides --help
 ```
 
 ### FastMCP Server Mode (for AI Assistant Integration)
@@ -187,10 +184,10 @@ Start the FastMCP server for integration with AI assistants like Amazon Q Develo
 
 ```bash
 # Using uv (recommended)
-uv run python server.py --mcp
+uv run mcp_server.py
 
 # Using python directly
-python server.py --mcp
+python mcp_server.py
 ```
 
 ## FastMCP Setup (Amazon Q Developer and Kiro)
@@ -219,7 +216,7 @@ Add the PowerPoint Translator FastMCP server configuration:
   "mcpServers": {
     "ppt-translator": {
       "command": "uv",
-      "args": ["run", "/path/to/ppt-translator/fastmcp_server.py"],
+      "args": ["run", "/path/to/ppt-translator/mcp_server.py"],
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default",
@@ -243,7 +240,7 @@ Add the PowerPoint Translator FastMCP server configuration:
   "mcpServers": {
     "ppt-translator": {
       "command": "python",
-      "args": ["/path/to/ppt-translator/fastmcp_server.py"],
+      "args": ["/path/to/ppt-translator/mcp_server.py"],
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default",
@@ -263,37 +260,17 @@ Add the PowerPoint Translator FastMCP server configuration:
 
 **Important**: Replace `/path/to/ppt-translator/` with the actual path to your cloned repository.
 
-### 3. Verify FastMCP Server
-
-Test that the FastMCP server is working:
-
-```bash
-# Navigate to your project directory
-cd /path/to/ppt-translator
-
-# Test the FastMCP server using uv
-uv run python server.py --mcp --test
-
-# Or test using python directly
-python server.py --mcp --test
-```
-
-
-### 4. Use PowerPoint Translation
+### 3. Use PowerPoint Translation
 
 Once connected, you can use commands like (User input does not have to be in English):
 
 ```
-Translate original.pptx to Korean
+Please translate slides 10 to 13 of original.pptx into Korean.
 ```
 
-```
-Please translate slides 10 to 13 of original.pptx into Japanese.
-```
+## Available MCP Tools
 
-## Available FastMCP Tools
-
-The FastMCP server provides the following tools:
+The MCP server provides the following tools:
 
 - **`translate_powerpoint`**: Translate an entire PowerPoint presentation
   - Parameters:
@@ -377,7 +354,7 @@ The service supports translation between major languages including:
    - Verify the path in mcp.json is correct
    - Check that Python and dependencies are properly installed
    - Review logs in Q Developer for error messages
-   - Test the server: `uv run python server.py --mcp --test`
+   - Test the server: `uv run python mcp_server.py`
 
 4. **PowerPoint File Issues**:
    - Ensure the input file is a valid PowerPoint (.pptx) file
@@ -393,40 +370,27 @@ The service supports translation between major languages including:
 
 ```
 ppt-translator/
-├── server.py              # Main server entry point (standalone & MCP)
-├── fastmcp_server.py      # FastMCP server implementation
-├── ppt_handler.py         # PowerPoint processing logic
-├── translation_engine.py  # Translation service
-├── bedrock_client.py      # Amazon Bedrock client
-├── post_processing.py     # Post-processing utilities for translations
-├── config.py             # Configuration management
-├── dependencies.py       # Dependency management
-├── text_utils.py         # Text processing utilities
-├── prompts.py            # Translation prompts
-├── requirements.txt      # Python dependencies
-├── pyproject.toml        # Project configuration (uv)
-└── imgs/                 # Example images and screenshots
-```
-
-### Using uv for Development
-
-This project uses `uv` for dependency management:
-
-```bash
-# Install dependencies
-uv sync
-
-# Run the server
-uv run python server.py --mcp
-
-# Run tests
-uv run python server.py --mcp --test
-
-# Add new dependencies
-uv add package-name
-
-# Update dependencies
-uv sync --upgrade
+├── mcp_server.py                    # FastMCP server implementation
+├── main.py                          # Main entry point
+├── ppt_translator/                  # Core package
+│   ├── __init__.py                  # Package initialization
+│   ├── cli.py                       # Command-line interface
+│   ├── ppt_handler.py               # PowerPoint processing logic
+│   ├── translation_engine.py        # Translation service
+│   ├── bedrock_client.py            # Amazon Bedrock client
+│   ├── post_processing.py           # Post-processing utilities
+│   ├── config.py                    # Configuration management
+│   ├── dependencies.py              # Dependency management
+│   ├── text_utils.py                # Text processing utilities
+│   └── prompts.py                   # Translation prompts
+├── requirements.txt                 # Python dependencies
+├── pyproject.toml                   # Project configuration (uv)
+├── uv.lock                          # Dependency lock file
+├── .env                             # Environment variables template
+├── Dockerfile                       # Docker configuration
+├── docs/                            # Documentation
+├── imgs/                            # Example images and screenshots
+└── samples/                         # Sample files
 ```
 
 ## License
