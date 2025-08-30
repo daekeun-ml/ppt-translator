@@ -41,10 +41,6 @@ The PowerPoint Translator maintains the original formatting while accurately tra
 
 ### Usage Examples
 
-
-# Translate specific slides (individual slides)
-uv run ppt-translate translate-slides samples/en.pptx --slides "1,3" --target-language ko
-
 **Translate entire presentation:**
 ```bash
 uv run ppt-translate translate samples/en.pptx --target-language ko
