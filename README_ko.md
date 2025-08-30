@@ -43,19 +43,19 @@ PowerPoint 번역기는 원본 서식을 유지하면서 정확하게 내용을 
 
 **전체 프레젠테이션 번역:**
 ```bash
-uv run ppt-translate translate presentation.pptx --target-language ko
+uv run ppt-translate translate samples/en.pptx --target-language ko
 ```
 
 ![standalone](imgs/standalone.png)
 
 **특정 슬라이드 번역:**
 ```bash
-uv run ppt-translate translate-slides presentation.pptx --slides "1,3,5" --target-language ja
+uv run ppt-translate translate-slides samples/en.pptx --slides "1,3" --target-language ko
 ```
 
 **슬라이드 정보 확인:**
 ```bash
-uv run ppt-translate info presentation.pptx
+uv run ppt-translate info samples/en.pptx
 ```
 
 ![get-slideinfo](imgs/get-slideinfo.png)

@@ -41,21 +41,25 @@ The PowerPoint Translator maintains the original formatting while accurately tra
 
 ### Usage Examples
 
+
+# Translate specific slides (individual slides)
+uv run ppt-translate translate-slides samples/en.pptx --slides "1,3" --target-language ko
+
 **Translate entire presentation:**
 ```bash
-uv run python server.py --translate --input-file presentation.pptx --target-language ko
+uv run ppt-translate translate samples/en.pptx --target-language ko
 ```
 
 ![standalone](imgs/standalone.png)
 
 **Translate specific slides:**
 ```bash
-uv run python server.py --translate-slides "1,3,5" --input-file presentation.pptx --target-language ja
+uv run ppt-translate translate-slides samples/en.pptx --slides "1,3" --target-language ko
 ```
 
 **Get slide information:**
 ```bash
-uv run python server.py --slide-info --input-file presentation.pptx
+uv run ppt-translate info samples/en.pptx
 ```
 
 ![get-slideinfo](imgs/get-slideinfo.png)
