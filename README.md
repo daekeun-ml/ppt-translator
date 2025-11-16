@@ -2,6 +2,10 @@
 
 A powerful PowerPoint translation tool that leverages Amazon Bedrock models for high-quality translation. This service can be used both as a standalone command-line tool and as a FastMCP (Fast Model Context Protocol) service for integration with AI assistants like Amazon Q Developer. It translates PowerPoint presentations while preserving formatting and structure.
 
+<a href="https://glama.ai/mcp/servers/@daekeun-ml/ppt-translator">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@daekeun-ml/ppt-translator/badge" alt="PowerPoint Translator MCP server" />
+</a>
+
 ## Features
 
 - **PowerPoint Translation**: Translate text content in PowerPoint presentations
