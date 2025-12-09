@@ -57,38 +57,32 @@ class Config:
         'zh-MY': FONT_CHINESE,
     }
     
-    # Supported models
+    # Supported models (text generation only)
     SUPPORTED_MODELS = [
-        # Amazon Nova models
-        "amazon.nova-micro-v1:0",
-        "amazon.nova-lite-v1:0", 
-        "amazon.nova-pro-v1:0",
-        "amazon.nova-premier-v1:0",
+        # Amazon Nova models (text-only)
+        "us.amazon.nova-micro-v1:0",
+        "us.amazon.nova-lite-v1:0", 
+        "us.amazon.nova-pro-v1:0",
+        "us.amazon.nova-premier-v1:0",
+        "global.amazon.nova-2-lite-v1:0",
+        "us.amazon.nova-2-lite-v1:0"
         
         # Anthropic Claude models
-        "anthropic.claude-3-sonnet-20240229-v1:0",
-        "anthropic.claude-3-haiku-20240307-v1:0",
-        "anthropic.claude-3-5-sonnet-20240620-v1:0",
+        "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "global.anthropic.claude-opus-4-5-20251101-v1:0",
+        "global.anthropic.claude-sonnet-4-20250514-v1:0",
+        "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
         "anthropic.claude-3-5-sonnet-20241022-v2:0",
-        "anthropic.claude-3-5-haiku-20241022-v1:0",
-        "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
         "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
-        "us.anthropic.claude-3-5-haiku-20241022-v1:0",
         "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
-        "us.anthropic.claude-opus-4-20250514-v1:0",
+        "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "us.anthropic.claude-opus-4-5-20251101-v1:0",
         "us.anthropic.claude-sonnet-4-20250514-v1:0",
-        "us.anthropic.claude-opus-4-1-20250805-v1:0",
+        "us.anthropic.claude-sonnet-4-5-20250929-v1:0",      
 
         # Meta Llama models
-        "meta.llama3-8b-instruct-v1:0",
-        "meta.llama3-70b-instruct-v1:0",
-        "us.meta.llama3-1-8b-instruct-v1:0",
-        "us.meta.llama3-1-70b-instruct-v1:0",
-        "us.meta.llama3-2-1b-instruct-v1:0",
-        "us.meta.llama3-2-3b-instruct-v1:0",
-        "us.meta.llama3-2-11b-instruct-v1:0",
-        "us.meta.llama3-2-90b-instruct-v1:0",
-        "us.meta.llama3-3-70b-instruct-v1:0",
+        "meta.llama4-scout-17b-instruct-v1:0",
+        "meta.llama4-maverick-17b-instruct-v1:0",
         "us.meta.llama4-scout-17b-instruct-v1:0",
         "us.meta.llama4-maverick-17b-instruct-v1:0",
         
@@ -100,8 +94,12 @@ class Config:
         "mistral.mistral-7b-instruct-v0:2",
         "mistral.mixtral-8x7b-instruct-v0:1",
         "mistral.mistral-large-2402-v1:0",
+        "mistral.mistral-large-3-675b-instruct",
         "mistral.mistral-small-2402-v1:0",
-        "mistral.pixtral-large-2502-v1:0",
+        "mistral.magistral-small-2509",
+        "mistral.ministral-3-3b-instruct",
+        "mistral.ministral-3-8b-instruct",
+        "mistral.ministral-3-14b-instruct",
         
         # Cohere models
         "cohere.command-r-v1:0",
@@ -110,7 +108,29 @@ class Config:
         # AI21 models 
         "ai21.jamba-1-5-large-v1:0",
         "ai21.jamba-1-5-mini-v1:0",
-        "ai21.jamba-instruct-v1:0",
+        
+        # OpenAI models
+        "openai.gpt-oss-20b-1:0",
+        "openai.gpt-oss-120b-1:0",
+        "openai.gpt-oss-safeguard-20b",
+        "openai.gpt-oss-safeguard-120b",
+        
+        # Qwen models (text-only)
+        "qwen.qwen3-32b-v1:0",
+        "qwen.qwen3-next-80b-a3b",
+        "qwen.qwen3-coder-30b-a3b-v1:0",
+
+        # Google models
+        "google.gemma-3-4b-it",
+        "google.gemma-3-12b-it",
+        "google.gemma-3-27b-it",
+        
+        # Writer models
+        "us.writer.palmyra-x4-v1:0",
+        "us.writer.palmyra-x5-v1:0",
+
+        # Upstage models
+        "upstage-solar-pro"
     ]
     
     # Language mapping - Comprehensive list of supported languages

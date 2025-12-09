@@ -121,5 +121,59 @@ def info(input_file):
         sys.exit(1)
 
 
+@cli.command()
+@click.argument('input_folder', type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.option('-t', '--target-language', default=Config.DEFAULT_TARGET_LANGUAGE, help='Target language')
+@click.option('-o', '--output-folder', help='Output folder path')
+@click.option('-m', '--model-id', default=Config.DEFAULT_MODEL_ID, help='Bedrock model ID')
+@click.option('--no-polishing', is_flag=True, help='Disable natural language polishing')
+def batch_translate(input_folder, target_language, output_folder, model_id, no_polishing):
+    """Translate all PowerPoint files in a folder"""
+    input_path = Path(input_folder)
+    output_path = Path(output_folder) if output_folder else input_path / f"translated_{target_language}"
+    output_path.mkdir(parents=True, exist_ok=True)
+    
+    ppt_files = list(input_path.glob("*.pptx")) + list(input_path.glob("*.ppt"))
+    
+    if not ppt_files:
+        click.echo(f"❌ No PowerPoint files found in {input_folder}", err=True)
+        sys.exit(1)
+    
+    click.echo(f"📁 Found {len(ppt_files)} PowerPoint file(s)")
+    click.echo(f"🌍 Target language: {target_language}")
+    click.echo(f"📂 Output folder: {output_path}")
+    click.echo()
+    
+    translator = PowerPointTranslator(model_id, not no_polishing)
+    success_count = 0
+    failed_files = []
+    
+    for idx, ppt_file in enumerate(ppt_files, 1):
+        click.echo(f"[{idx}/{len(ppt_files)}] 🚀 Translating: {ppt_file.name}")
+        output_file = output_path / f"{ppt_file.stem}_{target_language}{ppt_file.suffix}"
+        
+        try:
+            result = translator.translate_presentation(str(ppt_file), str(output_file), target_language)
+            if result:
+                click.echo(f"[{idx}/{len(ppt_files)}] ✅ Completed: {output_file.name}")
+                success_count += 1
+            else:
+                click.echo(f"[{idx}/{len(ppt_files)}] ❌ Failed: {ppt_file.name}")
+                failed_files.append(ppt_file.name)
+        except Exception as e:
+            click.echo(f"[{idx}/{len(ppt_files)}] ❌ Error: {ppt_file.name} - {e}")
+            failed_files.append(ppt_file.name)
+        
+        click.echo()
+    
+    click.echo("=" * 60)
+    click.echo(f"✨ Batch translation completed!")
+    click.echo(f"   Success: {success_count}/{len(ppt_files)}")
+    if failed_files:
+        click.echo(f"   Failed: {len(failed_files)}")
+        for failed in failed_files:
+            click.echo(f"     - {failed}")
+
+
 if __name__ == '__main__':
     cli()

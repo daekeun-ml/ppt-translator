@@ -15,8 +15,8 @@ A powerful PowerPoint translation tool that leverages Amazon Bedrock models for 
 - **Color & Style Preservation**: Preserves original text colors and formatting even for untranslated content
 - **Standalone & MCP Support**: Use as a command-line tool or integrate with AI assistants via FastMCP
 - **Multiple Languages**: Supports translation between various languages
-- **Batch Processing**: Can handle multiple slides and text elements efficiently
-- **Selective Translation**: Translate entire presentations or specific slides
+- **Batch Processing**: Can handle multiple slides, text elements, and entire folders efficiently
+- **Selective Translation**: Translate entire presentations, specific slides, or all files in a folder
 
 ## Examples
 
@@ -55,6 +55,15 @@ uv run ppt-translate translate samples/en.pptx --target-language ko
 **Translate specific slides:**
 ```bash
 uv run ppt-translate translate-slides samples/en.pptx --slides "1,3" --target-language ko
+```
+
+**Batch translate all PPT files in a folder:**
+```bash
+# Translate all PPT files in samples/ folder to Korean
+uv run ppt-translate batch-translate samples/ --target-language ko
+
+# Specify output folder
+uv run ppt-translate batch-translate samples/ -t ja -o output/
 ```
 
 **Get slide information:**

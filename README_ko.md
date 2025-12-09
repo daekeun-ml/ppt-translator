@@ -11,8 +11,8 @@ Amazon Bedrock 모델을 활용하여 고품질 번역을 제공하는 강력한
 - **색상 및 스타일 보존**: 번역되지 않은 내용도 원본 텍스트 색상과 서식 유지
 - **독립 실행형 및 MCP 지원**: 명령줄 도구로 사용하거나 FastMCP를 통해 AI 어시스턴트와 통합
 - **다국어 지원**: 다양한 언어 간 번역 지원
-- **배치 처리**: 여러 슬라이드와 텍스트 요소를 효율적으로 처리
-- **선택적 번역**: 전체 프레젠테이션 또는 특정 슬라이드 번역
+- **배치 처리**: 여러 슬라이드, 텍스트 요소 및 전체 폴더를 효율적으로 처리
+- **선택적 번역**: 전체 프레젠테이션, 특정 슬라이드 또는 폴더 내 모든 파일 번역
 
 ## 예제
 
@@ -51,6 +51,15 @@ uv run ppt-translate translate samples/en.pptx --target-language ko
 **특정 슬라이드 번역:**
 ```bash
 uv run ppt-translate translate-slides samples/en.pptx --slides "1,3" --target-language ko
+```
+
+**폴더 내 모든 PPT 파일 일괄 번역:**
+```bash
+# samples/ 폴더의 모든 PPT 파일을 한국어로 번역
+uv run ppt-translate batch-translate samples/ --target-language ko
+
+# 출력 폴더 지정
+uv run ppt-translate batch-translate samples/ -t ja -o output/
 ```
 
 **슬라이드 정보 확인:**
@@ -172,6 +181,12 @@ uv run ppt-translate translate-slides samples/en.pptx --slides "2-4" --target-la
 
 # 혼합 번역 (개별 + 범위)
 uv run ppt-translate translate-slides samples/en.pptx --slides "1,2-4" --target-language ko
+
+# 폴더 내 모든 PPT 파일 일괄 번역
+uv run ppt-translate batch-translate samples/ --target-language ko
+
+# 출력 폴더 지정하여 일괄 번역
+uv run ppt-translate batch-translate samples/ -t ja -o output/
 
 # 슬라이드 정보 및 미리보기 확인
 uv run ppt-translate info samples/en.pptx

@@ -1,5 +1,5 @@
-python-pptx>=1.0.2
-boto3>=1.40.21
-fastmcp>=2.11.3
-python-dotenv>=1.1.1
+boto3>=1.42.5
+click>=8.3.1
+fastmcp>=2.13.3
+python-dotenv>=1.2.1
 python-pptx>=1.0.2

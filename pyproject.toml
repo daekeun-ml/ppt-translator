@@ -1,6 +1,6 @@
 [project]
 name = "ppt-translator"
-version = "1.0.4"
+version = "1.0.5"
 description = "PowerPoint Translator using Amazon Bedrock"
 readme = "README.md"
 requires-python = ">=3.11"

@@ -53,3 +53,9 @@ test_output/
 
 # Ipynb checkpoint
 .ipynb_checkpoints/
+
+uv.lock
+
+# For debugging outputs
+debug/
+output/
