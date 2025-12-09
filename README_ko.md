@@ -1,6 +1,6 @@
 # Amazon Bedrock을 사용한 PowerPoint 번역기
 
-Amazon Bedrock 모델을 활용하여 고품질 번역을 제공하는 강력한 PowerPoint 번역 도구입니다. 이 서비스는 독립 실행형 명령줄 도구로 사용하거나 Amazon Q Developer와 같은 AI 어시스턴트와 통합하기 위한 FastMCP(Fast Model Context Protocol) 서비스로 사용할 수 있습니다. 서식과 구조를 유지하면서 PowerPoint 프레젠테이션을 번역합니다.
+Amazon Bedrock 모델을 활용하여 고품질 번역을 제공하는 강력한 PowerPoint 번역 도구입니다. 이 서비스는 독립 실행형 명령줄 도구로 사용하거나 Kiro와 같은 AI 어시스턴트와 통합하기 위한 FastMCP(Fast Model Context Protocol) 서비스로 사용할 수 있습니다. 서식과 구조를 유지하면서 PowerPoint 프레젠테이션을 번역합니다.
 
 ## 기능
 
@@ -199,7 +199,7 @@ uv run ppt-translate translate-slides --help
 
 ### FastMCP 서버 모드 (AI 어시스턴트 통합용)
 
-Amazon Q Developer와 같은 AI 어시스턴트와 통합하기 위한 FastMCP 서버 시작:
+AI 어시스턴트(예: Kiro)와 통합하기 위한 FastMCP 서버 시작:
 
 ```bash
 # uv 사용 (권장)
@@ -209,12 +209,12 @@ uv run mcp_server.py
 python mcp_server.py
 ```
 
-## FastMCP 설정 (Amazon Q Developer 및 Kiro)
+## FastMCP 설정 (Kiro)
 
-Amazon Q Developer 또는 Kiro를 아직 설치하지 않았다면 다음을 참조하세요:
+Kiro를 아직 설치하지 않았다면 다음을 참조하세요:
 
-- Amazon Q Developer CLI: https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/command-line-installing.html
 - Kiro: https://kiro.dev
+- Kiro-CLI: https://kiro.dev/cli
 
 ### 2. FastMCP 서버 구성
 
@@ -223,7 +223,7 @@ Q Developer FastMCP 구성 파일을 생성하거나 업데이트하세요:
 #### Kiro
 **사용자 레벨** `~/.kiro/settings/mcp.json`
 
-#### Amazon Q Developer
+#### Kiro-CLI
 **macOS/Linux**: `~/.aws/amazonq/mcp.json`
 **Windows**: `%APPDATA%\amazonq\mcp.json`
 
@@ -239,7 +239,7 @@ PowerPoint 번역기 FastMCP 서버 구성 추가:
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default",
-        "BEDROCK_MODEL_ID": "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+        "BEDROCK_MODEL_ID": "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
       },
       "disabled": false,
       "autoApprove": [
@@ -263,7 +263,7 @@ PowerPoint 번역기 FastMCP 서버 구성 추가:
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default",
-        "BEDROCK_MODEL_ID": "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+        "BEDROCK_MODEL_ID": "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
       },
       "disabled": false,
       "autoApprove": [

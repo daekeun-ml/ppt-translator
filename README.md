@@ -1,6 +1,6 @@
 # PowerPoint Translator using Amazon Bedrock
 
-A powerful PowerPoint translation tool that leverages Amazon Bedrock models for high-quality translation. This service can be used both as a standalone command-line tool and as a FastMCP (Fast Model Context Protocol) service for integration with AI assistants like Amazon Q Developer. It translates PowerPoint presentations while preserving formatting and structure.
+A powerful PowerPoint translation tool that leverages Amazon Bedrock models for high-quality translation. This service can be used both as a standalone command-line tool and as a FastMCP (Fast Model Context Protocol) service for integration with AI assistants like Kiro. It translates PowerPoint presentations while preserving formatting and structure.
 
 <a href="https://glama.ai/mcp/servers/@daekeun-ml/ppt-translator">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/@daekeun-ml/ppt-translator/badge" alt="PowerPoint Translator MCP server" />
@@ -193,7 +193,7 @@ uv run ppt-translate translate-slides --help
 
 ### FastMCP Server Mode (for AI Assistant Integration)
 
-Start the FastMCP server for integration with AI assistants like Amazon Q Developer:
+Start the FastMCP server for integration with AI assistants like Kiro:
 
 ```bash
 # Using uv (recommended)
@@ -203,12 +203,12 @@ uv run mcp_server.py
 python mcp_server.py
 ```
 
-## FastMCP Setup (Amazon Q Developer and Kiro)
+## FastMCP Setup (Kiro)
 
-If you haven't already installed Amazon Q Developer or Kiro, please refer to this:
+If you haven't already installed Kiro, please refer to this:
 
-- Amazon Q Developer CLI: https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/command-line-installing.html
 - Kiro: https://kiro.dev
+- Kiro-CLI: https://kiro.dev/cli
 
 ### 2. Configure FastMCP Server
 
@@ -217,7 +217,7 @@ Create or update your Q Developer FastMCP configuration file:
 #### Kiro
 **User Level** `~/.kiro/settings/mcp.json`
 
-#### Amazon Q Developer
+#### Kiro CLI
 **On macOS/Linux**: `~/.aws/amazonq/mcp.json`
 **On Windows**: `%APPDATA%\amazonq\mcp.json`
 
@@ -233,7 +233,7 @@ Add the PowerPoint Translator FastMCP server configuration:
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default",
-        "BEDROCK_MODEL_ID": "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+        "BEDROCK_MODEL_ID": "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
       },
       "disabled": false,
       "autoApprove": [
@@ -257,7 +257,7 @@ Add the PowerPoint Translator FastMCP server configuration:
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default",
-        "BEDROCK_MODEL_ID": "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+        "BEDROCK_MODEL_ID": "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
       },
       "disabled": false,
       "autoApprove": [
