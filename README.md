@@ -59,11 +59,14 @@ uv run ppt-translate translate-slides samples/en.pptx --slides "1,3" --target-la
 
 **Batch translate all PPT files in a folder:**
 ```bash
-# Translate all PPT files in samples/ folder to Korean
+# Translate all PPT files in samples/ folder to Korean (parallel processing)
 uv run ppt-translate batch-translate samples/ --target-language ko
 
 # Specify output folder
 uv run ppt-translate batch-translate samples/ -t ja -o output/
+
+# Specify number of parallel workers (default: 4)
+uv run ppt-translate batch-translate samples/ -t ko -w 4
 ```
 
 **Get slide information:**

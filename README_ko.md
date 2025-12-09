@@ -55,11 +55,14 @@ uv run ppt-translate translate-slides samples/en.pptx --slides "1,3" --target-la
 
 **폴더 내 모든 PPT 파일 일괄 번역:**
 ```bash
-# samples/ 폴더의 모든 PPT 파일을 한국어로 번역
+# samples/ 폴더의 모든 PPT 파일을 한국어로 번역 (병렬 처리)
 uv run ppt-translate batch-translate samples/ --target-language ko
 
 # 출력 폴더 지정
 uv run ppt-translate batch-translate samples/ -t ja -o output/
+
+# 병렬 워커 수 지정 (기본값: 4)
+uv run ppt-translate batch-translate samples/ -t ko -w 4
 ```
 
 **슬라이드 정보 확인:**
@@ -182,11 +185,14 @@ uv run ppt-translate translate-slides samples/en.pptx --slides "2-4" --target-la
 # 혼합 번역 (개별 + 범위)
 uv run ppt-translate translate-slides samples/en.pptx --slides "1,2-4" --target-language ko
 
-# 폴더 내 모든 PPT 파일 일괄 번역
+# 폴더 내 모든 PPT 파일 일괄 번역 (병렬 처리)
 uv run ppt-translate batch-translate samples/ --target-language ko
 
 # 출력 폴더 지정하여 일괄 번역
 uv run ppt-translate batch-translate samples/ -t ja -o output/
+
+# 병렬 워커 수 지정 (기본값: 4)
+uv run ppt-translate batch-translate samples/ -t ko -w 4
 
 # 슬라이드 정보 및 미리보기 확인
 uv run ppt-translate info samples/en.pptx

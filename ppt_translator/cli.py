@@ -5,6 +5,7 @@ import click
 import sys
 import logging
 from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from .config import Config
 from .ppt_handler import PowerPointTranslator
@@ -121,14 +122,26 @@ def info(input_file):
         sys.exit(1)
 
 
+def _translate_single_file(args):
+    """Helper function for parallel processing"""
+    ppt_file, output_file, target_language, model_id, enable_polishing = args
+    try:
+        translator = PowerPointTranslator(model_id, enable_polishing)
+        result = translator.translate_presentation(str(ppt_file), str(output_file), target_language)
+        return (ppt_file.name, output_file.name, result, None)
+    except Exception as e:
+        return (ppt_file.name, None, False, str(e))
+
+
 @cli.command()
 @click.argument('input_folder', type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.option('-t', '--target-language', default=Config.DEFAULT_TARGET_LANGUAGE, help='Target language')
 @click.option('-o', '--output-folder', help='Output folder path')
 @click.option('-m', '--model-id', default=Config.DEFAULT_MODEL_ID, help='Bedrock model ID')
 @click.option('--no-polishing', is_flag=True, help='Disable natural language polishing')
-def batch_translate(input_folder, target_language, output_folder, model_id, no_polishing):
-    """Translate all PowerPoint files in a folder"""
+@click.option('-w', '--workers', default=4, type=int, help='Number of parallel workers (default: 4)')
+def batch_translate(input_folder, target_language, output_folder, model_id, no_polishing, workers):
+    """Translate all PowerPoint files in a folder (parallel processing)"""
     input_path = Path(input_folder)
     output_path = Path(output_folder) if output_folder else input_path / f"translated_{target_language}"
     output_path.mkdir(parents=True, exist_ok=True)
@@ -142,30 +155,54 @@ def batch_translate(input_folder, target_language, output_folder, model_id, no_p
     click.echo(f"📁 Found {len(ppt_files)} PowerPoint file(s)")
     click.echo(f"🌍 Target language: {target_language}")
     click.echo(f"📂 Output folder: {output_path}")
+    click.echo(f"⚡ Workers: {workers}")
     click.echo()
     
-    translator = PowerPointTranslator(model_id, not no_polishing)
+    # Prepare tasks
+    tasks = []
+    for ppt_file in ppt_files:
+        output_file = output_path / f"{ppt_file.stem}_{target_language}{ppt_file.suffix}"
+        tasks.append((ppt_file, output_file, target_language, model_id, not no_polishing))
+    
     success_count = 0
     failed_files = []
+    completed = 0
     
-    for idx, ppt_file in enumerate(ppt_files, 1):
-        click.echo(f"[{idx}/{len(ppt_files)}] 🚀 Translating: {ppt_file.name}")
-        output_file = output_path / f"{ppt_file.stem}_{target_language}{ppt_file.suffix}"
+    # Process with continuous batching
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        futures = {}
+        task_iter = iter(tasks)
         
-        try:
-            result = translator.translate_presentation(str(ppt_file), str(output_file), target_language)
-            if result:
-                click.echo(f"[{idx}/{len(ppt_files)}] ✅ Completed: {output_file.name}")
-                success_count += 1
-            else:
-                click.echo(f"[{idx}/{len(ppt_files)}] ❌ Failed: {ppt_file.name}")
-                failed_files.append(ppt_file.name)
-        except Exception as e:
-            click.echo(f"[{idx}/{len(ppt_files)}] ❌ Error: {ppt_file.name} - {e}")
-            failed_files.append(ppt_file.name)
+        # Submit initial batch
+        for _ in range(min(workers, len(tasks))):
+            task = next(task_iter, None)
+            if task:
+                futures[executor.submit(_translate_single_file, task)] = task
         
-        click.echo()
+        # Process as completed and submit new tasks
+        while futures:
+            done, _ = as_completed(futures), None
+            for future in done:
+                completed += 1
+                task = futures.pop(future)
+                filename, output_name, result, error = future.result()
+                
+                if result:
+                    click.echo(f"[{completed}/{len(ppt_files)}] ✅ Completed: {output_name}")
+                    success_count += 1
+                else:
+                    error_msg = f" - {error}" if error else ""
+                    click.echo(f"[{completed}/{len(ppt_files)}] ❌ Failed: {filename}{error_msg}")
+                    failed_files.append(filename)
+                
+                # Submit next task
+                next_task = next(task_iter, None)
+                if next_task:
+                    futures[executor.submit(_translate_single_file, next_task)] = next_task
+                
+                break  # Process one at a time
     
+    click.echo()
     click.echo("=" * 60)
     click.echo(f"✨ Batch translation completed!")
     click.echo(f"   Success: {success_count}/{len(ppt_files)}")
