@@ -24,7 +24,7 @@ class Config:
     TEMPERATURE = float(os.getenv('TEMPERATURE', '0.1'))
     ENABLE_POLISHING = os.getenv('ENABLE_POLISHING', 'true').lower() == 'true'
     BATCH_SIZE = int(os.getenv('BATCH_SIZE', '20'))
-    CONTEXT_THRESHOLD = int(os.getenv('CONTEXT_THRESHOLD', '5'))
+    CONTEXT_THRESHOLD = int(os.getenv('CONTEXT_THRESHOLD', '100'))  # Effectively disable context translation
     
     # Debug settings
     DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
@@ -313,6 +313,27 @@ class Config:
         r'^\d+$',  # Numbers only
         r'^https?://',  # URLs
         r'\S+@\S+\.\S+',  # Email addresses
+        r'^```.*```$',  # Code blocks
+        r'^\s*[{}\[\]();,.:]+\s*$',  # Code syntax characters only
+        r'^\s*import\s+\w+',  # Python imports
+        r'^\s*from\s+\w+\s+import',  # Python from imports
+        r'^\s*def\s+\w+\(',  # Python function definitions
+        r'^\s*class\s+\w+',  # Python class definitions
+        r'^\s*if\s+.*:',  # Python if statements
+        r'^\s*for\s+.*:',  # Python for loops
+        r'^\s*while\s+.*:',  # Python while loops
+        r'^\s*try\s*:',  # Python try blocks
+        r'^\s*except\s*.*:',  # Python except blocks
+        r'^\s*return\s+',  # Python return statements
+        r'^\s*print\s*\(',  # Python print statements
+        r'^\s*console\.log\s*\(',  # JavaScript console.log
+        r'^\s*function\s+\w+\s*\(',  # JavaScript functions
+        r'^\s*var\s+\w+\s*=',  # JavaScript var declarations
+        r'^\s*let\s+\w+\s*=',  # JavaScript let declarations
+        r'^\s*const\s+\w+\s*=',  # JavaScript const declarations
+        r'^\s*\$\s*\(',  # jQuery
+        r'^\s*<\w+.*>.*</\w+>\s*$',  # HTML tags
+        r'^\s*<\w+.*/?>\s*$',  # Self-closing HTML tags
     ]
     
     @classmethod

@@ -54,12 +54,13 @@ class TranslationEngine:
         try:
             prompt = self.prompt_generator.create_single_prompt(target_language, self.enable_polishing)
             
+            target_lang_name = Config.LANGUAGE_MAP.get(target_language, target_language)
             response = self.bedrock.converse(
                 modelId=self.model_id,
-                system=[{"text": prompt}],
+                system=[{"text": "You are a translator. Provide ONLY the translation. No explanations, alternatives, context notes, arrows, or additional text."}],
                 messages=[{
                     "role": "user",
-                    "content": [{"text": text}]
+                    "content": [{"text": f"{prompt}\n\nText: {text}"}]
                 }],
                 inferenceConfig={
                     "maxTokens": Config.MAX_TOKENS,
@@ -69,6 +70,11 @@ class TranslationEngine:
             
             translated_text = response['output']['message']['content'][0]['text'].strip()
             translated_text = self.text_processor.clean_translation_response(translated_text)
+            
+            # If cleaning resulted in empty text, return original
+            if not translated_text:
+                logger.warning(f"Empty translation response, keeping original: {text[:50]}...")
+                return text
             
             # Remove quotes if wrapped
             if (translated_text.startswith('"') and translated_text.endswith('"')) or \
@@ -105,18 +111,22 @@ class TranslationEngine:
             return texts
         
         try:
-            # Create batch input
-            batch_input = "---SEPARATOR---".join(translatable_texts)
+            # Create batch input with numbered format for better parsing
+            batch_input = ""
+            for i, text in enumerate(translatable_texts, 1):
+                batch_input += f"[{i}] {text}\n"
+            
             prompt = self.prompt_generator.create_batch_prompt(target_language, self.enable_polishing)
             
             logger.info(f"🔄 Batch translating {len(translatable_texts)} texts...")
             
+            target_lang_name = Config.LANGUAGE_MAP.get(target_language, target_language)
             response = self.bedrock.converse(
                 modelId=self.model_id,
-                system=[{"text": prompt}],
+                system=[{"text": "You are a translator. Translate each numbered text exactly as provided. Respond ONLY with translations in the same numbered format. Do not add explanations, alternatives, or additional content."}],
                 messages=[{
                     "role": "user",
-                    "content": [{"text": batch_input}]
+                    "content": [{"text": f"{prompt}\n\n{batch_input}"}]
                 }],
                 inferenceConfig={
                     "maxTokens": Config.MAX_TOKENS,
@@ -125,11 +135,17 @@ class TranslationEngine:
             )
             
             translated_batch = response['output']['message']['content'][0]['text'].strip()
-            cleaned_parts = self.text_processor.parse_batch_response(translated_batch, len(translatable_texts))
             
-            # Handle count mismatch
+            # Try numbered parsing first
+            cleaned_parts = self.text_processor.parse_numbered_response(translated_batch, len(translatable_texts))
+            
+            # If numbered parsing fails, try separator parsing
             if len(cleaned_parts) != len(translatable_texts):
-                logger.warning("⚠️ Batch translation count mismatch, using fallback")
+                cleaned_parts = self.text_processor.parse_batch_response(translated_batch, len(translatable_texts))
+            
+            # Only allow exact match or fallback immediately
+            if len(cleaned_parts) != len(translatable_texts):
+                logger.warning(f"⚠️ Batch translation count mismatch. Expected {len(translatable_texts)}, got {len(cleaned_parts)}, using fallback")
                 return self._fallback_individual_translation(texts, target_language)
             
             # Reconstruct results with skipped texts
@@ -141,8 +157,9 @@ class TranslationEngine:
                     if translatable_idx < len(cleaned_parts):
                         results[i] = cleaned_parts[translatable_idx]
                         translatable_idx += 1
+                    # If we run out of translations, keep original text
             
-            logger.info(f"✅ Batch translation completed for {len(translatable_texts)} texts")
+            logger.info(f"✅ Batch translation completed for {min(len(cleaned_parts), len(translatable_texts))} texts")
             return results
             
         except Exception as e:
@@ -150,44 +167,15 @@ class TranslationEngine:
             return self._fallback_individual_translation(texts, target_language)
     
     def translate_with_context(self, text_items: List[Dict], target_language: str, notes_text: str = "") -> List[str]:
-        """Translate with full context awareness"""
+        """Translate with full context awareness - simplified to use batch translation"""
         if not text_items:
             return []
         
-        try:
-            slide_context = SlideTextCollector.build_slide_context(text_items, notes_text)
-            prompt = self.prompt_generator.create_context_prompt(target_language, slide_context, self.enable_polishing)
-            
-            logger.info(f"🎯 Context-aware translation for {len(text_items)} texts...")
-            
-            response = self.bedrock.converse(
-                modelId=self.model_id,
-                system=[{"text": prompt}],
-                messages=[{
-                    "role": "user",
-                    "content": [{"text": "Please translate all the texts maintaining context and coherence."}]
-                }],
-                inferenceConfig={
-                    "maxTokens": Config.MAX_TOKENS,
-                    "temperature": Config.TEMPERATURE
-                }
-            )
-            
-            translated_response = response['output']['message']['content'][0]['text'].strip()
-            translations = self.text_processor.parse_context_response(translated_response)
-            
-            if len(translations) == len(text_items):
-                logger.info(f"✅ Context-aware translation completed: {len(translations)} texts")
-                return translations
-            else:
-                logger.warning("⚠️ Context translation parsing failed, falling back to batch")
-                texts = [item['text'] for item in text_items]
-                return self.translate_batch(texts, target_language)
-            
-        except Exception as e:
-            logger.error(f"❌ Context translation error: {str(e)}")
-            texts = [item['text'] for item in text_items]
-            return self.translate_batch(texts, target_language)
+        logger.info(f"🔄 Context translation requested for {len(text_items)} texts, using batch translation instead")
+        
+        # Extract texts and use batch translation (more reliable)
+        texts = [item['text'] for item in text_items]
+        return self.translate_batch(texts, target_language)
     
     def _fallback_individual_translation(self, texts: List[str], target_language: str) -> List[str]:
         """Fallback to individual translation when batch fails"""

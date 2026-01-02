@@ -62,11 +62,17 @@ uv run ppt-translate translate-slides samples/en.pptx --slides "1,3" --target-la
 # Translate all PPT files in samples/ folder to Korean (parallel processing)
 uv run ppt-translate batch-translate samples/ --target-language ko
 
+# Recursively translate all PPT files in subfolders (like reInvent-2025/session1/, session2/, etc.)
+uv run ppt-translate batch-translate samples/ --target-language ko --recursive
+
 # Specify output folder
 uv run ppt-translate batch-translate samples/ -t ja -o output/
 
 # Specify number of parallel workers (default: 4)
 uv run ppt-translate batch-translate samples/ -t ko -w 4
+
+# Recursive with custom output and workers
+uv run ppt-translate batch-translate reInvent-2025/ -t ko -o translated/ --recursive -w 8
 ```
 
 **Get slide information:**

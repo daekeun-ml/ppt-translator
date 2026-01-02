@@ -140,28 +140,39 @@ def _translate_single_file(args):
 @click.option('-m', '--model-id', default=Config.DEFAULT_MODEL_ID, help='Bedrock model ID')
 @click.option('--no-polishing', is_flag=True, help='Disable natural language polishing')
 @click.option('-w', '--workers', default=4, type=int, help='Number of parallel workers (default: 4)')
-def batch_translate(input_folder, target_language, output_folder, model_id, no_polishing, workers):
+@click.option('-r', '--recursive', is_flag=True, help='Recursively process subfolders')
+def batch_translate(input_folder, target_language, output_folder, model_id, no_polishing, workers, recursive):
     """Translate all PowerPoint files in a folder (parallel processing)"""
     input_path = Path(input_folder)
     output_path = Path(output_folder) if output_folder else input_path / f"translated_{target_language}"
     output_path.mkdir(parents=True, exist_ok=True)
     
-    ppt_files = list(input_path.glob("*.pptx")) + list(input_path.glob("*.ppt"))
+    # Find PowerPoint files (recursive or non-recursive)
+    if recursive:
+        ppt_files = list(input_path.rglob("*.pptx")) + list(input_path.rglob("*.ppt"))
+    else:
+        ppt_files = list(input_path.glob("*.pptx")) + list(input_path.glob("*.ppt"))
     
     if not ppt_files:
-        click.echo(f"❌ No PowerPoint files found in {input_folder}", err=True)
+        search_type = "recursively" if recursive else ""
+        click.echo(f"❌ No PowerPoint files found {search_type} in {input_folder}", err=True)
         sys.exit(1)
     
     click.echo(f"📁 Found {len(ppt_files)} PowerPoint file(s)")
     click.echo(f"🌍 Target language: {target_language}")
     click.echo(f"📂 Output folder: {output_path}")
     click.echo(f"⚡ Workers: {workers}")
+    if recursive:
+        click.echo("🔄 Recursive mode: ON")
     click.echo()
     
-    # Prepare tasks
+    # Prepare tasks with relative path preservation
     tasks = []
     for ppt_file in ppt_files:
-        output_file = output_path / f"{ppt_file.stem}_{target_language}{ppt_file.suffix}"
+        # Preserve folder structure in output
+        relative_path = ppt_file.relative_to(input_path)
+        output_file = output_path / relative_path.parent / f"{relative_path.stem}_{target_language}{relative_path.suffix}"
+        output_file.parent.mkdir(parents=True, exist_ok=True)
         tasks.append((ppt_file, output_file, target_language, model_id, not no_polishing))
     
     success_count = 0
