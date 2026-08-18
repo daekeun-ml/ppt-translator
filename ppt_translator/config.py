@@ -15,16 +15,67 @@ class Config:
     """Configuration constants"""
     # AWS Configuration
     AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
-    AWS_PROFILE = os.getenv('AWS_PROFILE', 'default')
+    AWS_PROFILE = os.getenv('AWS_PROFILE')
+    MANTLE_API_KEY = os.getenv('AWS_BEARER_TOKEN_BEDROCK')
+    MANTLE_OPENAI_BASE_URL = os.getenv(
+        'BEDROCK_MANTLE_OPENAI_BASE_URL',
+        f'https://bedrock-mantle.{AWS_REGION}.api.aws/openai/v1',
+    ).rstrip('/')
+    MANTLE_TIMEOUT_SECONDS = float(os.getenv('BEDROCK_MANTLE_TIMEOUT_SECONDS', '300'))
     
     # Translation settings from environment
     DEFAULT_TARGET_LANGUAGE = os.getenv('DEFAULT_TARGET_LANGUAGE', 'ko')
-    DEFAULT_MODEL_ID = os.getenv('BEDROCK_MODEL_ID', 'global.anthropic.claude-sonnet-4-6')
+    DEFAULT_MODEL_ID = os.getenv(
+        'MANTLE_MODEL_ID',
+        os.getenv('BEDROCK_MODEL_ID', 'openai.gpt-5.6-terra'),
+    )
+    ENABLE_MODEL_FALLBACK = (
+        os.getenv('MANTLE_ENABLE_MODEL_FALLBACK', 'true').lower() == 'true'
+    )
+    FALLBACK_MODEL_ID = os.getenv(
+        'MANTLE_FALLBACK_MODEL_ID',
+        'openai.gpt-5.6-luna',
+    ).strip()
     MAX_TOKENS = int(os.getenv('MAX_TOKENS', '4000'))
     TEMPERATURE = float(os.getenv('TEMPERATURE', '0.1'))
+    OPENAI_REASONING_EFFORT = os.getenv('OPENAI_REASONING_EFFORT', 'none')
     ENABLE_POLISHING = os.getenv('ENABLE_POLISHING', 'true').lower() == 'true'
     BATCH_SIZE = int(os.getenv('BATCH_SIZE', '20'))
     CONTEXT_THRESHOLD = int(os.getenv('CONTEXT_THRESHOLD', '100'))  # Effectively disable context translation
+    BATCH_WORKERS = max(1, int(os.getenv('BATCH_WORKERS', '10')))
+    SLIDE_WORKERS = max(1, int(os.getenv('SLIDE_WORKERS', '4')))
+    SLIDES_PER_WORKER = max(1, int(os.getenv('SLIDES_PER_WORKER', '30')))
+
+    # PowerPoint-to-Markdown settings
+    MARKDOWN_WORKERS = max(1, int(os.getenv('MARKDOWN_WORKERS', '4')))
+    MARKDOWN_SLIDES_PER_CHUNK = max(
+        1,
+        int(os.getenv('MARKDOWN_SLIDES_PER_CHUNK', '10')),
+    )
+    MARKDOWN_MAX_TOKENS = max(
+        256,
+        int(os.getenv('MARKDOWN_MAX_TOKENS', '3000')),
+    )
+    MARKDOWN_OVERVIEW_MAX_TOKENS = max(
+        256,
+        int(os.getenv('MARKDOWN_OVERVIEW_MAX_TOKENS', '2000')),
+    )
+    MARKDOWN_WEB_MAX_TOKENS = max(
+        256,
+        int(os.getenv('MARKDOWN_WEB_MAX_TOKENS', '1500')),
+    )
+    MARKDOWN_MAX_WEB_QUERIES = max(
+        1,
+        int(os.getenv('MARKDOWN_MAX_WEB_QUERIES', '3')),
+    )
+    MARKDOWN_SEARCH_RESULTS_PER_QUERY = max(
+        1,
+        int(os.getenv('MARKDOWN_SEARCH_RESULTS_PER_QUERY', '5')),
+    )
+    MARKDOWN_REASONING_EFFORT = os.getenv(
+        'MARKDOWN_REASONING_EFFORT',
+        'low',
+    ).strip()
     
     # Debug settings
     DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
@@ -57,97 +108,18 @@ class Config:
         'zh-MY': FONT_CHINESE,
     }
     
-    # Supported models (text generation only)
+    # Models available through the Amazon Bedrock Mantle endpoint.
     SUPPORTED_MODELS = [
-        # Amazon Nova models (text-only)
-        "us.amazon.nova-micro-v1:0",
-        "us.amazon.nova-lite-v1:0",
-        "us.amazon.nova-pro-v1:0",
-        "us.amazon.nova-premier-v1:0",
-        "global.amazon.nova-2-lite-v1:0",
-        "us.amazon.nova-2-lite-v1:0",
+        # OpenAI GPT-5.6 family
+        "openai.gpt-5.6-sol",
+        "openai.gpt-5.6-terra",
+        "openai.gpt-5.6-luna",
+        "openai.gpt-5.6-cyber",
 
-        # Anthropic Claude models
-        # Claude 4.6 / 4.7 (no 20xxxxxx date-stamp suffix — AWS uses -v1 style for these)
-        "anthropic.claude-opus-4-7",
-        "us.anthropic.claude-opus-4-7",
-        "eu.anthropic.claude-opus-4-7",
-        "jp.anthropic.claude-opus-4-7",
-        "global.anthropic.claude-opus-4-7",
-        "anthropic.claude-opus-4-6-v1",
-        "us.anthropic.claude-opus-4-6-v1",
-        "eu.anthropic.claude-opus-4-6-v1",
-        "au.anthropic.claude-opus-4-6-v1",
-        "global.anthropic.claude-opus-4-6-v1",
-        "anthropic.claude-sonnet-4-6",
-        "us.anthropic.claude-sonnet-4-6",
-        "eu.anthropic.claude-sonnet-4-6",
-        "au.anthropic.claude-sonnet-4-6",
-        "global.anthropic.claude-sonnet-4-6",
-        # Claude 4.5 / 4
-        "global.anthropic.claude-haiku-4-5-20251001-v1:0",
-        "global.anthropic.claude-opus-4-5-20251101-v1:0",
-        "global.anthropic.claude-sonnet-4-20250514-v1:0",
-        "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
-        "anthropic.claude-3-5-sonnet-20241022-v2:0",
-        "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
-        "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
-        "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-        "us.anthropic.claude-opus-4-5-20251101-v1:0",
-        "us.anthropic.claude-sonnet-4-20250514-v1:0",
-        "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
-
-        # Meta Llama models
-        "meta.llama4-scout-17b-instruct-v1:0",
-        "meta.llama4-maverick-17b-instruct-v1:0",
-        "us.meta.llama4-scout-17b-instruct-v1:0",
-        "us.meta.llama4-maverick-17b-instruct-v1:0",
-        
-        # DeepSeek models 
-        "deepseek.r1-v1:0",
-        "us.deepseek.r1-v1:0",        
-        
-        # Mistral models
-        "mistral.mistral-7b-instruct-v0:2",
-        "mistral.mixtral-8x7b-instruct-v0:1",
-        "mistral.mistral-large-2402-v1:0",
-        "mistral.mistral-large-3-675b-instruct",
-        "mistral.mistral-small-2402-v1:0",
-        "mistral.magistral-small-2509",
-        "mistral.ministral-3-3b-instruct",
-        "mistral.ministral-3-8b-instruct",
-        "mistral.ministral-3-14b-instruct",
-        
-        # Cohere models
-        "cohere.command-r-v1:0",
-        "cohere.command-r-plus-v1:0",
-        
-        # AI21 models 
-        "ai21.jamba-1-5-large-v1:0",
-        "ai21.jamba-1-5-mini-v1:0",
-        
-        # OpenAI models
-        "openai.gpt-oss-20b-1:0",
-        "openai.gpt-oss-120b-1:0",
-        "openai.gpt-oss-safeguard-20b",
-        "openai.gpt-oss-safeguard-120b",
-        
-        # Qwen models (text-only)
-        "qwen.qwen3-32b-v1:0",
-        "qwen.qwen3-next-80b-a3b",
-        "qwen.qwen3-coder-30b-a3b-v1:0",
-
-        # Google models
-        "google.gemma-3-4b-it",
-        "google.gemma-3-12b-it",
-        "google.gemma-3-27b-it",
-        
-        # Writer models
-        "us.writer.palmyra-x4-v1:0",
-        "us.writer.palmyra-x5-v1:0",
-
-        # Upstage models
-        "upstage-solar-pro"
+        # Anthropic Claude
+        "anthropic.claude-opus-5",
+        "anthropic.claude-sonnet-5",
+        "anthropic.claude-haiku-4-5",
     ]
     
     # Language mapping - Comprehensive list of supported languages
@@ -375,34 +347,19 @@ class Config:
     
     @classmethod
     def check_aws_credentials(cls):
-        """Check if AWS credentials are properly configured"""
-        import boto3
-        from botocore.exceptions import NoCredentialsError, PartialCredentialsError
-        
+        """Check whether a Mantle API key or AWS credentials are usable."""
+        if cls.MANTLE_API_KEY:
+            return True, "Amazon Bedrock Mantle API key is configured."
         try:
-            # Try to create a session with the specified profile
-            if cls.AWS_PROFILE and cls.AWS_PROFILE != 'default':
-                session = boto3.Session(profile_name=cls.AWS_PROFILE)
-            else:
-                session = boto3.Session()
-            
-            # Try to get credentials
-            credentials = session.get_credentials()
-            if credentials is None:
-                return False, "No AWS credentials found. Please run 'aws configure' to set up your credentials."
-            
-            # Try to make a simple AWS call to verify credentials work
-            sts = session.client('sts', region_name=cls.AWS_REGION)
-            sts.get_caller_identity()
-            
-            return True, "AWS credentials are properly configured."
-            
-        except NoCredentialsError:
-            return False, "No AWS credentials found. Please run 'aws configure' to set up your credentials."
-        except PartialCredentialsError:
-            return False, "Incomplete AWS credentials. Please run 'aws configure' to complete your credential setup."
-        except Exception as e:
-            return False, f"AWS credential verification failed: {str(e)}"
+            from aws_bedrock_token_generator import provide_token
+            provide_token(region=cls.AWS_REGION)
+            return True, "AWS default credentials can generate a Bedrock token."
+        except Exception:
+            return (
+                False,
+                "No usable AWS credentials found. Run 'aws configure', use an "
+                "IAM role, or set AWS_BEARER_TOKEN_BEDROCK.",
+            )
     
     def __init__(self):
         """Initialize configuration with environment variables"""

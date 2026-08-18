@@ -1,18 +1,21 @@
 [project]
 name = "ppt-translator"
-version = "1.0.8"
+version = "1.1.0"
 description = "PowerPoint Translator using Amazon Bedrock"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "boto3>=1.40.21",
-    "click>=8.2.1",
-    "fastmcp>=2.11.3",
-    "python-dotenv>=1.1.1",
+    "anthropic[bedrock]>=0.122.0",
+    "aws-bedrock-token-generator>=1.1.0",
+    "click>=8.4.2",
+    "ddgs>=9.15.0",
+    "fastmcp>=3.4.7",
+    "openai>=3.2.0",
+    "python-dotenv>=1.2.3",
     "python-pptx>=1.0.2",
-    "tenacity>=8.2.0",
-    "pyyaml>=6.0",
-    "rich>=13.7.0",
+    "tenacity>=9.1.4",
+    "pyyaml>=6.0.3",
+    "rich>=15.0.0",
 ]
 
 [project.scripts]
@@ -22,5 +25,5 @@ ppt-translate = "ppt_translator.cli:cli"
 include = ["ppt_translator*"]
 
 [build-system]
-requires = ["setuptools>=80.0", "wheel"]
+requires = ["setuptools>=84.0.0", "wheel>=0.48.0"]
 build-backend = "setuptools.build_meta"

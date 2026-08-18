@@ -220,6 +220,13 @@ class TextProcessor:
     @staticmethod
     def parse_batch_response(response: str, expected_count: int) -> List[str]:
         """Parse batch translation response with improved error handling"""
+        numbered_parts = TextProcessor.parse_numbered_response(
+            response,
+            expected_count,
+        )
+        if len(numbered_parts) == expected_count:
+            return numbered_parts
+
         cleaned_response = TextProcessor.clean_translation_response(response)
         parts = cleaned_response.split("---SEPARATOR---")
         
@@ -228,56 +235,40 @@ class TextProcessor:
         
         # If count mismatch, try alternative parsing methods
         if len(cleaned_parts) != expected_count:
-            logger.warning(f"⚠️ Batch translation count mismatch. Expected {expected_count}, got {len(cleaned_parts)}")
-            
-            # Try parsing with numbered format [1], [2], etc.
-            numbered_parts = TextProcessor.parse_numbered_response(response, expected_count)
-            if len(numbered_parts) == expected_count:
-                logger.info("✅ Successfully parsed using numbered format")
-                return numbered_parts
-            
             # Try parsing with line breaks
             line_parts = TextProcessor._parse_line_response(response, expected_count)
             if len(line_parts) == expected_count:
-                logger.info("✅ Successfully parsed using line format")
                 return line_parts
-            
-            # If still mismatch, pad or truncate to match expected count
-            if len(cleaned_parts) < expected_count:
-                # Pad with empty strings
-                cleaned_parts.extend([''] * (expected_count - len(cleaned_parts)))
-                logger.warning(f"⚠️ Padded response to match expected count")
-            elif len(cleaned_parts) > expected_count:
-                # Truncate to expected count
-                cleaned_parts = cleaned_parts[:expected_count]
-                logger.warning(f"⚠️ Truncated response to match expected count")
         
         return cleaned_parts
     
     @staticmethod
     def parse_numbered_response(response: str, expected_count: int) -> List[str]:
-        """Try to parse response with numbered format [1], [2], etc."""
+        """Parse numbered output whether markers are inline or on new lines."""
+        cleaned_response = response.strip()
+        marker_pattern = re.compile(r'\[(\d+)\]\s*')
+        matches = list(marker_pattern.finditer(cleaned_response))
+        if not matches:
+            return []
+
+        numbers = [int(match.group(1)) for match in matches]
+        if numbers != list(range(1, expected_count + 1)):
+            return []
+
         translations = []
-        lines = response.strip().split('\n')
-        current_translation = ""
-        
-        for line in lines:
-            line = line.strip()
-            if re.match(r'^\[\d+\]', line):
-                # Save previous translation
-                if current_translation:
-                    translations.append(current_translation.strip())
-                # Start new translation (remove the number part)
-                current_translation = re.sub(r'^\[\d+\]\s*', '', line)
-            else:
-                # Continue current translation
-                if current_translation:
-                    current_translation += " " + line
-        
-        # Add the last translation
-        if current_translation:
-            translations.append(current_translation.strip())
-        
+        for index, match in enumerate(matches):
+            end = (
+                matches[index + 1].start()
+                if index + 1 < len(matches)
+                else len(cleaned_response)
+            )
+            translation = TextProcessor.clean_translation_part(
+                cleaned_response[match.end():end]
+            )
+            if not translation:
+                return []
+            translations.append(translation)
+
         return translations
     
     @staticmethod
@@ -364,13 +355,15 @@ class SlideTextCollector:
                     SlideTextCollector._collect_shape_texts(sub_shape, text_items, sub_idx, current_path)
                 return
             
-            # Handle table shapes
-            if hasattr(shape, 'table'):
+            # GraphicFrame.table raises ValueError when the frame is a chart.
+            # Use python-pptx's explicit discriminator instead of hasattr(),
+            # which evaluates the property getter.
+            if getattr(shape, 'has_table', False):
                 SlideTextCollector._collect_table_texts(shape, text_items, current_path)
                 return
             
             # Handle text frames - collect per-paragraph to preserve structure
-            if hasattr(shape, 'text_frame') and shape.text_frame:
+            if getattr(shape, 'has_text_frame', False) and shape.text_frame:
                 tf = shape.text_frame
                 paragraphs_with_text = [
                     (i, p) for i, p in enumerate(tf.paragraphs) if p.text.strip()

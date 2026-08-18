@@ -44,6 +44,12 @@ yarn-error.log
 # Test files
 test_output/
 *.test.*
+tests/
+
+# Local SQLite translation cache
+*.db
+*.db-wal
+*.db-shm
 
 # Macbook tmp files
 .DS_Store
@@ -61,6 +67,7 @@ debug/
 output/
 
 samples_debug/
+samples_tmp/
 .claude/
 
 # Internal release notes (kept locally, not published)

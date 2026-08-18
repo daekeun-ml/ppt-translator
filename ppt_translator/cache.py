@@ -4,13 +4,14 @@ Translation cache — pluggable backends.
 Backends share a minimal interface (`get` / `set` / `close`). Choose the
 backend at the CLI boundary with `--cache-backend sqlite|memory|none`.
 
-SQLite (default) is safe across ProcessPoolExecutor workers AS LONG AS each
-worker opens its own connection. Never share a sqlite3.Connection across a
-fork boundary — do `build_cache(...)` again inside the worker instead.
+SQLite (default) serializes access when shared by slide translation threads.
+Across ProcessPoolExecutor workers, each process must still open its own
+connection. Never share a sqlite3.Connection across a fork boundary.
 """
 import hashlib
 import logging
 import sqlite3
+import threading
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -76,19 +77,23 @@ class InMemoryCache(TranslationCache):
 
     def __init__(self):
         self._store: dict = {}
+        self._lock = threading.RLock()
 
     def get(self, key: str) -> Optional[str]:
-        return self._store.get(key)
+        with self._lock:
+            return self._store.get(key)
 
     def set(self, key: str, value: str) -> None:
-        self._store[key] = value
+        with self._lock:
+            self._store[key] = value
 
 
 class SQLiteCache(TranslationCache):
-    """File-backed cache. Each process should open its OWN instance."""
+    """Thread-safe file cache; each process must open its own instance."""
 
     def __init__(self, path: str):
         self.path = str(Path(path).expanduser())
+        self._lock = threading.RLock()
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         # isolation_level=None → autocommit; simpler than manual transactions.
         self._conn = sqlite3.connect(self.path, isolation_level=None, check_same_thread=False)
@@ -108,7 +113,11 @@ class SQLiteCache(TranslationCache):
 
     def get(self, key: str) -> Optional[str]:
         try:
-            row = self._conn.execute("SELECT v FROM cache WHERE k = ?", (key,)).fetchone()
+            with self._lock:
+                row = self._conn.execute(
+                    "SELECT v FROM cache WHERE k = ?",
+                    (key,),
+                ).fetchone()
             return row[0] if row else None
         except sqlite3.Error as e:
             logger.debug(f"SQLite get failed: {e}")
@@ -116,16 +125,18 @@ class SQLiteCache(TranslationCache):
 
     def set(self, key: str, value: str) -> None:
         try:
-            self._conn.execute(
-                "INSERT OR REPLACE INTO cache (k, v, created_at) VALUES (?, ?, ?)",
-                (key, value, time.time()),
-            )
+            with self._lock:
+                self._conn.execute(
+                    "INSERT OR REPLACE INTO cache (k, v, created_at) VALUES (?, ?, ?)",
+                    (key, value, time.time()),
+                )
         except sqlite3.Error as e:
             logger.debug(f"SQLite set failed: {e}")
 
     def close(self) -> None:
         try:
-            self._conn.close()
+            with self._lock:
+                self._conn.close()
         except sqlite3.Error:
             pass
 

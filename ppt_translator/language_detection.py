@@ -1,7 +1,7 @@
 """
-Source language detection via Bedrock (1-shot).
+Source language detection via Bedrock Mantle (1-shot).
 
-We ask the same Bedrock model we're about to translate with to classify
+We ask the same Mantle model we're about to translate with to classify
 a short sample of the document text. One call per presentation, cheap,
 and dramatically better than running langdetect on shapes that say "API"
 or "2024".
@@ -20,6 +20,7 @@ from .config import Config
 logger = logging.getLogger(__name__)
 
 _MAX_SAMPLE_CHARS = 1500
+_MAX_OUTPUT_TOKENS = 16
 _SYSTEM_PROMPT = (
     "You are a language identifier. Given a text sample, respond with ONLY "
     "the ISO 639-1 two-letter code of its dominant language (e.g., en, ko, "
@@ -83,7 +84,7 @@ def detect_language(texts: List[str],
                 "content": [{"text": f"Sample:\n{sample}"}],
             }],
             inferenceConfig={
-                "maxTokens": 8,      # two letters + safety margin
+                "maxTokens": _MAX_OUTPUT_TOKENS,
                 "temperature": 0.0,  # deterministic
             },
         )

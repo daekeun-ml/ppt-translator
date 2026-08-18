@@ -13,44 +13,15 @@ from typing import Dict, Tuple
 
 # (input $/1M tokens, output $/1M tokens)
 MODEL_PRICING: Dict[str, Tuple[float, float]] = {
-    # Anthropic Claude (Bedrock, US prices as of 2025)
-    'us.anthropic.claude-3-7-sonnet-20250219-v1:0': (3.00, 15.00),
-    'us.anthropic.claude-3-5-sonnet-20241022-v2:0': (3.00, 15.00),
-    'us.anthropic.claude-3-5-sonnet-20240620-v1:0': (3.00, 15.00),
-    'us.anthropic.claude-3-5-haiku-20241022-v1:0': (0.80, 4.00),
-    'us.anthropic.claude-3-haiku-20240307-v1:0': (0.25, 1.25),
-    'us.anthropic.claude-3-opus-20240229-v1:0': (15.00, 75.00),
-    'us.anthropic.claude-sonnet-4-20250514-v1:0': (3.00, 15.00),
-    'us.anthropic.claude-opus-4-20250514-v1:0': (15.00, 75.00),
-    # Global inference profiles (cross-region)
-    'global.anthropic.claude-sonnet-4-5-20250929-v1:0': (3.00, 15.00),
-    'global.anthropic.claude-opus-4-5-20251101-v1:0': (15.00, 75.00),
-    'global.anthropic.claude-haiku-4-5-20251001-v1:0': (1.00, 5.00),
-    # Claude 4.6 / 4.7 (prices follow published Anthropic tier pricing;
-    # verify on aws.amazon.com/bedrock/pricing before using as authoritative)
-    'anthropic.claude-sonnet-4-6': (3.00, 15.00),
-    'us.anthropic.claude-sonnet-4-6': (3.00, 15.00),
-    'eu.anthropic.claude-sonnet-4-6': (3.00, 15.00),
-    'au.anthropic.claude-sonnet-4-6': (3.00, 15.00),
-    'global.anthropic.claude-sonnet-4-6': (3.00, 15.00),
-    'anthropic.claude-opus-4-6-v1': (15.00, 75.00),
-    'us.anthropic.claude-opus-4-6-v1': (15.00, 75.00),
-    'eu.anthropic.claude-opus-4-6-v1': (15.00, 75.00),
-    'au.anthropic.claude-opus-4-6-v1': (15.00, 75.00),
-    'global.anthropic.claude-opus-4-6-v1': (15.00, 75.00),
-    'anthropic.claude-opus-4-7': (15.00, 75.00),
-    'us.anthropic.claude-opus-4-7': (15.00, 75.00),
-    'eu.anthropic.claude-opus-4-7': (15.00, 75.00),
-    'jp.anthropic.claude-opus-4-7': (15.00, 75.00),
-    'global.anthropic.claude-opus-4-7': (15.00, 75.00),
-    # Amazon Nova
-    'us.amazon.nova-micro-v1:0': (0.035, 0.14),
-    'us.amazon.nova-lite-v1:0': (0.06, 0.24),
-    'us.amazon.nova-pro-v1:0': (0.80, 3.20),
-    'us.amazon.nova-premier-v1:0': (2.50, 12.50),
-    # Meta Llama 4
-    'us.meta.llama4-scout-17b-instruct-v1:0': (0.17, 0.66),
-    'us.meta.llama4-maverick-17b-instruct-v1:0': (0.24, 0.97),
+    # Bedrock Mantle in-region, standard tier, USD per 1M tokens.
+    # GPT-5.6 values use the short-context rate (up to 272K tokens).
+    'openai.gpt-5.6-sol': (5.50, 33.00),
+    'openai.gpt-5.6-terra': (2.20, 13.20),
+    'openai.gpt-5.6-luna': (0.22, 1.32),
+    'openai.gpt-5.6-cyber': (13.75, 82.50),
+    'anthropic.claude-opus-5': (5.00, 25.00),
+    'anthropic.claude-sonnet-5': (2.00, 10.00),
+    'anthropic.claude-haiku-4-5': (1.00, 5.00),
 }
 
 

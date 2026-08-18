@@ -31,7 +31,9 @@ class DependencyManager:
         """Check and import dependencies"""
         deps = {
             'pptx': ('pptx', 'Presentation'),
-            'boto3': ('boto3', None),
+            'anthropic': ('anthropic', None),
+            'aws_bedrock_token_generator': ('aws_bedrock_token_generator', None),
+            'openai': ('openai', None),
             'dotenv': ('dotenv', 'load_dotenv'),
             'mcp': ('mcp', 'MCPServer')
         }
@@ -66,7 +68,14 @@ class DependencyManager:
 
 def install_dependencies():
     """Install required dependencies using pip"""
-    packages = ["mcp", "python-pptx", "boto3", "python-dotenv"]
+    packages = [
+        "mcp",
+        "python-pptx",
+        "anthropic[bedrock]",
+        "aws-bedrock-token-generator",
+        "openai",
+        "python-dotenv",
+    ]
     
     try:
         logger.info("📦 Installing dependencies with pip...")

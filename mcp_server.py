@@ -17,6 +17,8 @@ from ppt_translator.ppt_handler import PowerPointTranslator
 from ppt_translator.post_processing import PowerPointPostProcessor
 from ppt_translator.cache import build_cache
 from ppt_translator.glossary import find_default_glossary, get_glossary_for_language, load_glossary
+from ppt_translator.logging_utils import quiet_dependency_logs
+from ppt_translator.markdown_exporter import MarkdownExporter
 from ppt_translator.pricing import estimate_cost, estimate_tokens
 
 
@@ -65,6 +67,7 @@ def _dry_run_report(translator: PowerPointTranslator, input_path: Path,
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
+quiet_dependency_logs()
 logger = logging.getLogger(__name__)
 
 # Initialize FastMCP server
@@ -114,6 +117,13 @@ def validate_input_path(input_file: str) -> tuple[Path, str]:
     
     return input_path, ""
 
+
+def _validate_markdown_language(language: str) -> Optional[str]:
+    if language == "source" or language in Config.LANGUAGE_MAP:
+        return None
+    available = ", ".join(["source", *sorted(Config.LANGUAGE_MAP)])
+    return f"❌ Error: Unsupported Markdown language '{language}'. Available: {available}"
+
 @mcp.tool()
 def translate_powerpoint(
     input_file: str,
@@ -127,6 +137,8 @@ def translate_powerpoint(
     translate_charts: bool = True,
     source_language: Optional[str] = None,
     auto_detect_source: bool = True,
+    slide_workers: int = Config.SLIDE_WORKERS,
+    slides_per_worker: int = Config.SLIDES_PER_WORKER,
 ) -> str:
     """
     Translate a PowerPoint presentation to the specified language.
@@ -135,12 +147,14 @@ def translate_powerpoint(
         input_file: Path to the input PowerPoint file (.pptx)
         target_language: Target language code (e.g., 'ko', 'ja', 'es', 'fr', 'de')
         output_file: Path to save the translated file (optional, auto-generated if not provided)
-        model_id: AWS Bedrock model ID to use for translation
+        model_id: Amazon Bedrock Mantle model ID to use for translation
         enable_polishing: Enable natural language polishing for more fluent translation
         glossary_file: Path to a glossary YAML file (defaults to ./glossary.yaml if present)
         cache_backend: Translation cache backend: 'sqlite' (default), 'memory', or 'none'
         dry_run: If True, estimate cost without translating or saving the output file
         translate_charts: If True, translate chart titles, axes, categories, and series names
+        slide_workers: Maximum parallel workers within this presentation
+        slides_per_worker: Number of slides assigned to each worker
 
     Returns:
         Success message with translation details (or dry-run report if dry_run=True)
@@ -163,7 +177,9 @@ def translate_powerpoint(
             translator = PowerPointTranslator(model_id, enable_polishing,
                                               glossary=glossary, translate_charts=translate_charts,
                                               source_language=source_language,
-                                              auto_detect_source=auto_detect_source)
+                                              auto_detect_source=auto_detect_source,
+                                              slide_workers=slide_workers,
+                                              slides_per_worker=slides_per_worker)
             return _dry_run_report(translator, input_path, target_language, model_id,
                                    detect_source=auto_detect_source)
 
@@ -177,7 +193,9 @@ def translate_powerpoint(
                                               cache=cache, glossary=glossary,
                                               translate_charts=translate_charts,
                                               source_language=source_language,
-                                              auto_detect_source=auto_detect_source)
+                                              auto_detect_source=auto_detect_source,
+                                              slide_workers=slide_workers,
+                                              slides_per_worker=slides_per_worker)
             result = translator.translate_presentation(str(input_path), output_file, target_language)
         
         # Apply post-processing if enabled
@@ -236,6 +254,8 @@ def translate_specific_slides(
     translate_charts: bool = True,
     source_language: Optional[str] = None,
     auto_detect_source: bool = True,
+    slide_workers: int = Config.SLIDE_WORKERS,
+    slides_per_worker: int = Config.SLIDES_PER_WORKER,
 ) -> str:
     """
     Translate specific slides in a PowerPoint presentation.
@@ -245,8 +265,10 @@ def translate_specific_slides(
         slide_numbers: Comma-separated slide numbers to translate (e.g., "1,3,5" or "2-4,7")
         target_language: Target language code (e.g., 'ko', 'ja', 'es', 'fr', 'de')
         output_file: Path to save the translated file (optional, auto-generated if not provided)
-        model_id: AWS Bedrock model ID to use for translation
+        model_id: Amazon Bedrock Mantle model ID to use for translation
         enable_polishing: Enable natural language polishing for more fluent translation
+        slide_workers: Maximum parallel workers within this presentation
+        slides_per_worker: Number of slides assigned to each worker
     
     Returns:
         Success message with translation details
@@ -281,7 +303,9 @@ def translate_specific_slides(
             translator = PowerPointTranslator(model_id, enable_polishing,
                                               glossary=glossary, translate_charts=translate_charts,
                                               source_language=source_language,
-                                              auto_detect_source=auto_detect_source)
+                                              auto_detect_source=auto_detect_source,
+                                              slide_workers=slide_workers,
+                                              slides_per_worker=slides_per_worker)
             return _dry_run_report(translator, input_path, target_language, model_id,
                                    slide_numbers=slide_list,
                                    detect_source=auto_detect_source)
@@ -301,7 +325,9 @@ def translate_specific_slides(
                                               cache=cache, glossary=glossary,
                                               translate_charts=translate_charts,
                                               source_language=source_language,
-                                              auto_detect_source=auto_detect_source)
+                                              auto_detect_source=auto_detect_source,
+                                              slide_workers=slide_workers,
+                                              slides_per_worker=slides_per_worker)
             result = translator.translate_specific_slides(str(input_path), output_file, target_language, slide_list)
         
         # Check for errors
@@ -350,6 +376,192 @@ def translate_specific_slides(
     except Exception as e:
         logger.error(f"Specific slides translation failed: {str(e)}")
         return f"❌ Translation failed: {str(e)}"
+
+
+@mcp.tool()
+def export_powerpoint_markdown(
+    input_file: str,
+    output_file: Optional[str] = None,
+    output_language: str = Config.DEFAULT_TARGET_LANGUAGE,
+    model_id: str = Config.DEFAULT_MODEL_ID,
+    mode: str = "structured",
+    web_verify: bool = False,
+    max_web_queries: int = Config.MARKDOWN_MAX_WEB_QUERIES,
+    workers: int = Config.MARKDOWN_WORKERS,
+    slides_per_chunk: int = Config.MARKDOWN_SLIDES_PER_CHUNK,
+    cache_backend: str = "sqlite",
+    cache_path: Optional[str] = None,
+) -> str:
+    """Export one PowerPoint presentation as structured Markdown.
+
+    Args:
+        input_file: Path to a .pptx file
+        output_file: Markdown output path; generated beside the PPT when omitted
+        output_language: Language code for AI notes, or "source"
+        model_id: Bedrock Mantle model used for structured mode
+        mode: "structured" for AI notes or "extract" for deterministic extraction
+        web_verify: Run bounded client-side web verification
+        max_web_queries: Maximum search queries when web_verify is enabled
+        workers: Concurrent slide-summary chunks
+        slides_per_chunk: Slides supplied to each summary request
+        cache_backend: sqlite, memory, or none
+        cache_path: Optional SQLite cache path
+    """
+    try:
+        input_path, error_msg = validate_input_path(input_file)
+        if error_msg:
+            return error_msg
+        language_error = _validate_markdown_language(output_language)
+        if language_error:
+            return language_error
+        if mode not in {"structured", "extract"}:
+            return "❌ Error: mode must be 'structured' or 'extract'"
+        if web_verify and mode != "structured":
+            return "❌ Error: web_verify requires mode='structured'"
+
+        if not output_file:
+            suffix = "" if output_language == "source" else f"_{output_language}"
+            output_file = str(
+                input_path.with_name(f"{input_path.stem}{suffix}.md")
+            )
+
+        with build_cache(cache_backend, cache_path) as cache:
+            exporter = MarkdownExporter(
+                model_id=model_id,
+                output_language=output_language,
+                cache=cache,
+                chunk_size=max(1, slides_per_chunk),
+                workers=max(1, workers),
+            )
+            result = exporter.export(
+                input_path,
+                output_file,
+                mode=mode,
+                web_verify=web_verify,
+                max_web_queries=max(1, min(max_web_queries, 10)),
+            )
+        metrics = result.metrics
+        return (
+            "✅ PowerPoint Markdown export completed!\n\n"
+            f"📁 Input file: {input_path}\n"
+            f"📄 Output file: {result.output_file}\n"
+            f"📊 Slides: {result.slide_count}\n"
+            f"📝 Mode: {result.mode}\n"
+            f"🌐 Output language: {output_language}\n"
+            f"🔎 Web verification: {'ON' if result.web_verified else 'OFF'}\n"
+            f"🤖 Model calls: {metrics.api_calls}\n"
+            f"🪙 Tokens: {metrics.tokens_in}+{metrics.tokens_out}\n"
+            f"🔍 Web queries: {metrics.web_queries}"
+        )
+    except Exception as exc:
+        logger.error("Markdown export failed: %s", exc)
+        return f"❌ Markdown export failed: {exc}"
+
+
+@mcp.tool()
+def batch_export_powerpoint_markdown(
+    input_folder: str,
+    output_folder: Optional[str] = None,
+    output_language: str = Config.DEFAULT_TARGET_LANGUAGE,
+    model_id: str = Config.DEFAULT_MODEL_ID,
+    mode: str = "structured",
+    web_verify: bool = False,
+    max_web_queries: int = Config.MARKDOWN_MAX_WEB_QUERIES,
+    recursive: bool = True,
+    workers: int = Config.BATCH_WORKERS,
+    chunk_workers: int = Config.MARKDOWN_WORKERS,
+    slides_per_chunk: int = Config.MARKDOWN_SLIDES_PER_CHUNK,
+    cache_backend: str = "sqlite",
+    cache_path: Optional[str] = None,
+) -> str:
+    """Export all PowerPoint files in a folder as Markdown."""
+    try:
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+        from ppt_translator.cli import (
+            _discover_markdown_source_files,
+            _export_markdown_single_file,
+        )
+
+        input_path = Path(input_folder).expanduser().resolve()
+        if not input_path.is_dir():
+            return f"❌ Error: Input folder not found: {input_folder}"
+        language_error = _validate_markdown_language(output_language)
+        if language_error:
+            return language_error
+        if mode not in {"structured", "extract"}:
+            return "❌ Error: mode must be 'structured' or 'extract'"
+        if web_verify and mode != "structured":
+            return "❌ Error: web_verify requires mode='structured'"
+
+        output_path = (
+            Path(output_folder).expanduser().resolve()
+            if output_folder
+            else input_path / f"markdown_{output_language}"
+        )
+        try:
+            ppt_files = _discover_markdown_source_files(
+                input_path,
+                output_path,
+                recursive,
+            )
+        except ValueError as exc:
+            return f"❌ Error: {exc}"
+        if not ppt_files:
+            return f"❌ No .pptx files found in {input_path}"
+
+        output_path.mkdir(parents=True, exist_ok=True)
+        tasks = []
+        for ppt_file in ppt_files:
+            relative = ppt_file.relative_to(input_path)
+            output_file = output_path / relative.parent / f"{relative.stem}.md"
+            output_file.parent.mkdir(parents=True, exist_ok=True)
+            tasks.append((
+                ppt_file,
+                output_file,
+                output_language,
+                model_id,
+                mode,
+                web_verify,
+                max(1, min(max_web_queries, 10)),
+                max(1, chunk_workers),
+                max(1, slides_per_chunk),
+                cache_backend,
+                cache_path or str(Path.home() / ".ppt-translator" / "cache.db"),
+            ))
+
+        successes = 0
+        failures = []
+        file_workers = min(max(1, workers), len(tasks))
+        with ProcessPoolExecutor(max_workers=file_workers) as executor:
+            futures = [
+                executor.submit(_export_markdown_single_file, task)
+                for task in tasks
+            ]
+            for future in as_completed(futures):
+                filename, _, success, error, _ = future.result()
+                if success:
+                    successes += 1
+                else:
+                    failures.append(f"{filename}: {error}")
+
+        result = (
+            "✅ Batch PowerPoint Markdown export completed!\n\n"
+            f"📁 Input folder: {input_path}\n"
+            f"📁 Output folder: {output_path}\n"
+            f"📊 Files: {successes}/{len(tasks)}\n"
+            f"⚡ File workers: {file_workers}\n"
+            f"🧵 Chunk workers per presentation: {max(1, chunk_workers)}\n"
+            f"🔎 Web verification: {'ON' if web_verify else 'OFF'}"
+        )
+        if failures:
+            result += "\n\n❌ Failed files:\n" + "\n".join(
+                f"• {failure}" for failure in failures
+            )
+        return result
+    except Exception as exc:
+        logger.error("Batch Markdown export failed: %s", exc)
+        return f"❌ Batch Markdown export failed: {exc}"
+
 
 @mcp.tool()
 def get_slide_info(input_file: str) -> str:
@@ -464,12 +676,12 @@ def list_supported_languages() -> str:
 @mcp.tool()
 def list_supported_models() -> str:
     """
-    List all supported AWS Bedrock models for translation.
+    List all supported Amazon Bedrock Mantle models for translation.
     
     Returns:
         List of supported model IDs
     """
-    models_text = "🤖 Supported AWS Bedrock models:\n\n"
+    models_text = "🤖 Supported Amazon Bedrock Mantle models:\n\n"
     for model in Config.SUPPORTED_MODELS:
         models_text += f"• {model}\n"
     
@@ -490,6 +702,8 @@ def get_translation_help() -> str:
 • translate_powerpoint() - Translate entire PowerPoint presentation
 • translate_specific_slides() - Translate only specific slides
 • batch_translate_powerpoint() - Translate all PowerPoint files in a folder
+• export_powerpoint_markdown() - Export one presentation as structured Markdown
+• batch_export_powerpoint_markdown() - Export a folder of presentations as Markdown
 • get_slide_info() - Get presentation overview and slide previews
 • get_slide_preview() - Get detailed preview of a specific slide
 
@@ -500,10 +714,12 @@ def get_translation_help() -> str:
 🔧 Optional Parameters:
 • target_language: Language code (default: 'ko' for Korean)
 • output_file/output_folder: Output path (auto-generated if not specified)
-• model_id: Bedrock model (default: Claude Sonnet 4.6)
+• model_id: Bedrock Mantle model (default: GPT-5.6 Terra)
 • enable_polishing: Natural translation vs literal (default: true)
+• slide_workers: Parallel workers within one presentation (default: 4)
+• slides_per_worker: Slides assigned to each worker (default: 30)
 • recursive: Process subfolders (default: true, for batch only)
-• workers: Parallel workers (default: 4, for batch only)
+• workers: Concurrent PowerPoint files (default: 10, for batch only)
 
 💡 Usage Examples:
 
@@ -540,6 +756,18 @@ def get_translation_help() -> str:
 11. Literal translation (no polishing):
     translate_specific_slides("doc.pptx", "2,4", "ja", enable_polishing=False)
 
+12. Translate a large presentation in 20-slide chunks:
+    translate_powerpoint("large.pptx", slide_workers=4, slides_per_worker=20)
+
+13. Export structured Korean Markdown:
+    export_powerpoint_markdown("presentation.pptx", output_language="ko")
+
+14. Export source content without model calls:
+    export_powerpoint_markdown("presentation.pptx", output_language="source", mode="extract")
+
+15. Batch export Markdown with optional web verification:
+    batch_export_powerpoint_markdown("presentations/", web_verify=True)
+
 🌐 Get supported languages:
    list_supported_languages()
 
@@ -547,7 +775,9 @@ def get_translation_help() -> str:
    list_supported_models()
 
 ⚙️ Configuration:
-• AWS credentials must be configured (aws configure)
+• Configure AWS credentials with aws configure, AWS_PROFILE, or an IAM role
+• AWS_BEARER_TOKEN_BEDROCK is an optional long-term API key override
+• Large decks use 4 slide workers with 30 slides per worker by default
 • Bedrock access required in your AWS account
 • Supported file format: .pptx only
 
@@ -571,7 +801,7 @@ def batch_translate_powerpoint(
     model_id: str = Config.DEFAULT_MODEL_ID,
     enable_polishing: bool = True,
     recursive: bool = True,
-    workers: int = 4,
+    workers: int = Config.BATCH_WORKERS,
     glossary_file: Optional[str] = None,
     cache_backend: str = "sqlite",
     cache_path: Optional[str] = None,
@@ -579,6 +809,8 @@ def batch_translate_powerpoint(
     translate_charts: bool = True,
     source_language: Optional[str] = None,
     auto_detect_source: bool = True,
+    slide_workers: int = Config.SLIDE_WORKERS,
+    slides_per_worker: int = Config.SLIDES_PER_WORKER,
 ) -> str:
     """
     Translate all PowerPoint files in a folder (with optional recursive processing).
@@ -587,15 +819,17 @@ def batch_translate_powerpoint(
         input_folder: Path to the input folder containing PowerPoint files
         target_language: Target language code (e.g., 'ko', 'ja', 'es', 'fr', 'de')
         output_folder: Path to save translated files (optional, auto-generated if not provided)
-        model_id: AWS Bedrock model ID to use for translation
+        model_id: Amazon Bedrock Mantle model ID to use for translation
         enable_polishing: Enable natural language polishing for more fluent translation
         recursive: Process subfolders recursively (default: True — set to False to limit to top level)
-        workers: Number of parallel workers (default: 4)
+        workers: Number of PowerPoint files translated concurrently (default: 10)
         glossary_file: Path to a glossary YAML file (defaults to ./glossary.yaml if present)
         cache_backend: Translation cache backend: 'sqlite' (default), 'memory', or 'none'
         cache_path: SQLite cache path (ignored for memory/none backends)
         dry_run: If True, estimate aggregate cost without translating
         translate_charts: If True, translate chart titles/axes/categories/series
+        slide_workers: Maximum slide translation workers per presentation
+        slides_per_worker: Number of slides assigned to each slide worker
 
     Returns:
         Success message with batch translation details
@@ -604,9 +838,13 @@ def batch_translate_powerpoint(
         from concurrent.futures import ProcessPoolExecutor, as_completed
         # Reuse the module-level worker from the CLI so ProcessPoolExecutor can
         # pickle it — an inner function can't be pickled across fork/spawn.
-        from ppt_translator.cli import _translate_single_file
+        from ppt_translator.cli import (
+            _discover_presentation_files,
+            _resolve_batch_workers,
+            _translate_single_file,
+        )
 
-        input_path = Path(input_folder)
+        input_path = Path(input_folder).expanduser().resolve()
         if not input_path.exists() or not input_path.is_dir():
             return f"❌ Error: Input folder not found or not a directory: {input_folder}"
 
@@ -614,17 +852,25 @@ def batch_translate_powerpoint(
             available_langs = ', '.join(Config.LANGUAGE_MAP.keys())
             return f"❌ Error: Unsupported language '{target_language}'. Available: {available_langs}"
 
-        output_path = Path(output_folder) if output_folder else input_path / f"translated_{target_language}"
-        output_path.mkdir(parents=True, exist_ok=True)
-
-        if recursive:
-            ppt_files = list(input_path.rglob("*.pptx")) + list(input_path.rglob("*.ppt"))
-        else:
-            ppt_files = list(input_path.glob("*.pptx")) + list(input_path.glob("*.ppt"))
+        output_path = (
+            Path(output_folder).expanduser().resolve()
+            if output_folder
+            else input_path / f"translated_{target_language}"
+        )
+        try:
+            ppt_files = _discover_presentation_files(
+                input_path,
+                output_path,
+                recursive,
+            )
+        except ValueError as exc:
+            return f"❌ Error: {exc}"
 
         if not ppt_files:
             search_type = "recursively" if recursive else ""
             return f"❌ No PowerPoint files found {search_type} in {input_folder}"
+
+        output_path.mkdir(parents=True, exist_ok=True)
 
         # Resolve glossary once so every worker loads the same file.
         resolved_glossary_path = glossary_file
@@ -640,7 +886,9 @@ def batch_translate_powerpoint(
             translator = PowerPointTranslator(model_id, enable_polishing,
                                               glossary=glossary, translate_charts=translate_charts,
                                               source_language=source_language,
-                                              auto_detect_source=auto_detect_source)
+                                              auto_detect_source=auto_detect_source,
+                                              slide_workers=slide_workers,
+                                              slides_per_worker=slides_per_worker)
             for ppt_file in ppt_files:
                 stats = translator.collect_all_texts(
                     str(ppt_file),
@@ -668,6 +916,11 @@ def batch_translate_powerpoint(
             )
 
         # Prepare tasks with relative path preservation
+        file_worker_count, per_file_slide_workers = _resolve_batch_workers(
+            workers,
+            slide_workers,
+            len(ppt_files),
+        )
         tasks = []
         for ppt_file in ppt_files:
             relative_path = ppt_file.relative_to(input_path)
@@ -678,12 +931,13 @@ def batch_translate_powerpoint(
                 cache_backend, cache_path or str(Path.home() / '.ppt-translator' / 'cache.db'),
                 resolved_glossary_path, translate_charts,
                 source_language, auto_detect_source,
+                per_file_slide_workers, slides_per_worker,
             ))
 
         success_count = 0
         failed_files = []
 
-        with ProcessPoolExecutor(max_workers=workers) as executor:
+        with ProcessPoolExecutor(max_workers=file_worker_count) as executor:
             futures = {executor.submit(_translate_single_file, task): task for task in tasks}
             for future in as_completed(futures):
                 filename, output_name, result, error = future.result()
@@ -704,7 +958,8 @@ def batch_translate_powerpoint(
 🌐 Target language: {target_language} ({lang_name})
 🎨 Translation mode: {translation_mode}
 🤖 Model: {model_id}
-⚡ Workers: {workers}
+⚡ File workers: {file_worker_count}
+🧵 Slide workers per presentation: {per_file_slide_workers}
 
 📊 Results:
 • Total files found: {len(ppt_files)}

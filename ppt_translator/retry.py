@@ -1,9 +1,9 @@
 """
-Retry policy for AWS Bedrock API calls.
+Retry policy for Amazon Bedrock API calls.
 
 Centralizes which exceptions are worth retrying (throttling, transient
-server errors, network hiccups) and which are not (validation errors,
-permission issues). Uses tenacity for exponential backoff.
+server errors, network hiccups) across Bedrock Runtime and Mantle SDKs.
+Uses tenacity for exponential backoff.
 
 If tenacity is not installed, the `bedrock_retry` decorator degrades
 to a no-op so the package still imports.
@@ -33,8 +33,70 @@ _NON_RETRYABLE_CODES = {
 }
 
 
+def get_status_code(exc: BaseException):
+    """Extract an HTTP status code from OpenAI, Anthropic, or botocore errors."""
+    status_code = getattr(exc, 'status_code', None)
+    if status_code is None:
+        response = getattr(exc, 'response', None)
+        status_code = getattr(response, 'status_code', None)
+        if status_code is None and isinstance(response, dict):
+            status_code = (
+                response.get('ResponseMetadata', {})
+                .get('HTTPStatusCode')
+            )
+    if status_code is not None:
+        try:
+            return int(status_code)
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _bedrock_error_code(exc: BaseException) -> str:
+    response = getattr(exc, 'response', None)
+    if not isinstance(response, dict):
+        return ""
+    return str(response.get('Error', {}).get('Code', ''))
+
+
+def is_model_fallback_error(exc: BaseException) -> bool:
+    """Return True when retry exhaustion may be helped by another model."""
+    status_code = get_status_code(exc)
+    message = str(exc).lower()
+
+    # A different model does not resolve account quota or billing limits.
+    if status_code == 429 and any(
+        marker in message
+        for marker in ('insufficient_quota', 'billing', 'usage limit', 'quota')
+    ):
+        return False
+
+    if status_code in {429, 503}:
+        return True
+
+    error_code = _bedrock_error_code(exc)
+    if error_code in {'ThrottlingException', 'ServiceUnavailableException'}:
+        return True
+
+    exception_name = type(exc).__name__.lower()
+    return (
+        'ratelimit' in exception_name
+        or 'serviceunavailable' in exception_name
+    )
+
+
 def is_retryable(exc: BaseException) -> bool:
     """Return True if the given exception should trigger a retry."""
+    status_code = get_status_code(exc)
+    if status_code in {408, 409, 429, 500, 502, 503, 504}:
+        return True
+    if status_code in {400, 401, 403, 404, 422}:
+        return False
+
+    exception_name = type(exc).__name__.lower()
+    if any(token in exception_name for token in ('timeout', 'connection', 'ratelimit')):
+        return True
+
     try:
         from botocore.exceptions import ClientError, ReadTimeoutError, EndpointConnectionError, ConnectTimeoutError
     except ImportError:
@@ -44,7 +106,7 @@ def is_retryable(exc: BaseException) -> bool:
         return True
 
     if isinstance(exc, ClientError):
-        code = exc.response.get('Error', {}).get('Code', '') if hasattr(exc, 'response') else ''
+        code = _bedrock_error_code(exc)
         if code in _NON_RETRYABLE_CODES:
             return False
         return code in _RETRYABLE_CODES

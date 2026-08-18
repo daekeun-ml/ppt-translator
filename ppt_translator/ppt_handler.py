@@ -3,13 +3,16 @@ Optimized PowerPoint document handling and text frame updates
 """
 import logging
 import re
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any, Tuple, Optional
 from dataclasses import dataclass
 from pathlib import Path
 from pptx.dml.color import RGBColor
 from .config import Config
+from .bedrock_client import BedrockAuthenticationError
 from .dependencies import DependencyManager
-from .translation_engine import TranslationEngine
+from .translation_engine import TranslationEngine, TranslationMetrics
 from .text_utils import SlideTextCollector
 from .post_processing import PostProcessor
 
@@ -27,6 +30,30 @@ class TranslationResult:
     def __post_init__(self):
         if self.errors is None:
             self.errors = []
+
+
+@dataclass(frozen=True)
+class _SlideTranslationJob:
+    slide_number: int
+    texts: Tuple[str, ...]
+    notes_text: Optional[str]
+    use_individual_translation: bool
+
+
+@dataclass
+class _SlideApplicationContext:
+    slide: Any
+    text_items: List[Dict]
+    shape_count: int
+    job: _SlideTranslationJob
+
+
+@dataclass
+class _SlideTranslationPayload:
+    slide_number: int
+    translations: List[str]
+    translated_notes: Optional[str]
+    metrics: TranslationMetrics
 
 
 class FormattingExtractor:
@@ -919,12 +946,15 @@ class TranslationStrategy:
     def __init__(self, engine: TranslationEngine, text_updater: TextFrameUpdater):
         self.engine = engine
         self.text_updater = text_updater
-    
-    def translate_slide(self, slide, target_language: str, translate_charts: bool = True) -> Tuple[int, bool]:
-        """Translate a single slide using appropriate strategy"""
+
+    def collect_slide_content(
+        self,
+        slide,
+        translate_charts: bool = True,
+    ) -> Tuple[List[Dict], Optional[str], bool]:
+        """Collect slide content without modifying the presentation."""
         text_items, notes_text = SlideTextCollector().collect_slide_texts(slide)
 
-        # Collect chart text (titles/axes/categories/series) if enabled.
         if translate_charts:
             try:
                 from .chart_handler import ChartTextCollector
@@ -933,18 +963,50 @@ class TranslationStrategy:
             except Exception as e:
                 logger.debug(f"Chart collection failed: {e}")
 
+        use_individual = ComplexityAnalyzer.slide_has_complex_formatting(text_items)
+        return text_items, notes_text, use_individual
+
+    def translate_slide(self, slide, target_language: str, translate_charts: bool = True) -> Tuple[int, bool]:
+        """Translate a single slide using appropriate strategy"""
+        text_items, notes_text, use_individual = self.collect_slide_content(
+            slide,
+            translate_charts,
+        )
+
         translated_count = 0
         notes_translated = False
 
         if notes_text:
             notes_translated = self._translate_notes(slide, notes_text, target_language)
 
-        if ComplexityAnalyzer.slide_has_complex_formatting(text_items):
+        if use_individual:
             logger.info("🎨 Complex formatting detected, using individual translation")
             translated_count = self._translate_individually(text_items, target_language)
         else:
             translated_count = self._translate_with_batch(text_items, target_language)
 
+        return translated_count, notes_translated
+
+    def apply_translated_slide(
+        self,
+        slide,
+        text_items: List[Dict],
+        translations: List[str],
+        notes_text: Optional[str],
+        translated_notes: Optional[str],
+        target_language: str,
+    ) -> Tuple[int, bool]:
+        """Apply worker-produced strings to a slide on the main thread."""
+        notes_translated = False
+        if notes_text and translated_notes is not None and translated_notes != notes_text:
+            slide.notes_slide.notes_text_frame.text = translated_notes
+            notes_translated = True
+
+        translated_count = self._apply_translations(
+            text_items,
+            translations,
+            target_language,
+        )
         return translated_count, notes_translated
     
     def _translate_notes(self, slide, notes_text: str, target_language: str) -> bool:
@@ -954,6 +1016,8 @@ class TranslationStrategy:
             if translated_notes != notes_text:
                 slide.notes_slide.notes_text_frame.text = translated_notes
                 return True
+        except BedrockAuthenticationError:
+            raise
         except Exception as e:
             logger.error(f"Error translating slide notes: {str(e)}")
         return False
@@ -981,6 +1045,8 @@ class TranslationStrategy:
                     else:
                         logger.debug(f"🎨 Applied formatting to unchanged {item['type']}: '{original_text[:30]}...'")
                         
+            except BedrockAuthenticationError:
+                raise
             except Exception as e:
                 logger.error(f"Individual translation failed for item {i}: {str(e)}")
         
@@ -1003,6 +1069,8 @@ class TranslationStrategy:
             try:
                 batch_translations = self.engine.translate_batch(batch_texts, target_language)
                 translated_count += self._apply_translations(batch_items, batch_translations, target_language)
+            except BedrockAuthenticationError:
+                raise
             except Exception as e:
                 logger.error(f"Batch translation failed: {str(e)}")
                 # Individual fallback
@@ -1011,6 +1079,8 @@ class TranslationStrategy:
                         translation = self.engine.translate_text(item['text'], target_language)
                         if self._apply_translation_to_item(item, translation, target_language):
                             translated_count += 1
+                    except BedrockAuthenticationError:
+                        raise
                     except Exception:
                         pass
         
@@ -1094,10 +1164,14 @@ class PowerPointTranslator:
                  cache=None, glossary: Optional[Dict[str, str]] = None,
                  translate_charts: bool = True,
                  source_language: Optional[str] = None,
-                 auto_detect_source: bool = True):
+                 auto_detect_source: bool = True,
+                 slide_workers: int = Config.SLIDE_WORKERS,
+                 slides_per_worker: int = Config.SLIDES_PER_WORKER):
         self.model_id = model_id
         self.enable_polishing = enable_polishing
         self.translate_charts = translate_charts
+        self.slide_workers = max(1, int(slide_workers))
+        self.slides_per_worker = max(1, int(slides_per_worker))
         # Explicit override wins; otherwise we'll detect on first real run.
         self.source_language = source_language
         self.auto_detect_source = auto_detect_source and source_language is None
@@ -1132,6 +1206,205 @@ class PowerPointTranslator:
         except Exception as e:
             logger.debug(f"Source language auto-detect skipped: {e}")
 
+    @staticmethod
+    def _copy_metrics(metrics: TranslationMetrics) -> TranslationMetrics:
+        return TranslationMetrics(
+            cache_hits=metrics.cache_hits,
+            cache_misses=metrics.cache_misses,
+            tokens_in=metrics.tokens_in,
+            tokens_out=metrics.tokens_out,
+            api_calls=metrics.api_calls,
+        )
+
+    @staticmethod
+    def _metrics_delta(
+        before: TranslationMetrics,
+        after: TranslationMetrics,
+    ) -> TranslationMetrics:
+        return TranslationMetrics(
+            cache_hits=after.cache_hits - before.cache_hits,
+            cache_misses=after.cache_misses - before.cache_misses,
+            tokens_in=after.tokens_in - before.tokens_in,
+            tokens_out=after.tokens_out - before.tokens_out,
+            api_calls=after.api_calls - before.api_calls,
+        )
+
+    def _merge_metrics(self, metrics: TranslationMetrics) -> None:
+        self.engine.metrics.cache_hits += metrics.cache_hits
+        self.engine.metrics.cache_misses += metrics.cache_misses
+        self.engine.metrics.tokens_in += metrics.tokens_in
+        self.engine.metrics.tokens_out += metrics.tokens_out
+        self.engine.metrics.api_calls += metrics.api_calls
+
+    def _prepare_slide_context(
+        self,
+        slide_number: int,
+        slide,
+    ) -> _SlideApplicationContext:
+        text_items, notes_text, use_individual = self.strategy.collect_slide_content(
+            slide,
+            self.translate_charts,
+        )
+        return _SlideApplicationContext(
+            slide=slide,
+            text_items=text_items,
+            shape_count=len(slide.shapes),
+            job=_SlideTranslationJob(
+                slide_number=slide_number,
+                texts=tuple(item['text'] for item in text_items),
+                notes_text=notes_text,
+                use_individual_translation=use_individual,
+            ),
+        )
+
+    def _new_worker_engine(self) -> TranslationEngine:
+        return TranslationEngine(
+            self.model_id,
+            self.enable_polishing,
+            cache=self.engine.cache,
+            glossary=self.engine.glossary,
+            source_language=self.source_language,
+            log_initialization=False,
+        )
+
+    @staticmethod
+    def _translate_job(
+        engine: TranslationEngine,
+        job: _SlideTranslationJob,
+        target_language: str,
+    ) -> _SlideTranslationPayload:
+        before = PowerPointTranslator._copy_metrics(engine.metrics)
+
+        translated_notes = None
+        if job.notes_text:
+            translated_notes = engine.translate_text(
+                job.notes_text,
+                target_language,
+            )
+
+        translations: List[str] = []
+        if job.use_individual_translation:
+            logger.info(
+                "🎨 Slide %s has complex formatting; translating individually",
+                job.slide_number,
+            )
+            for text in job.texts:
+                translations.append(engine.translate_text(text, target_language))
+        else:
+            for start in range(0, len(job.texts), Config.BATCH_SIZE):
+                batch = list(job.texts[start:start + Config.BATCH_SIZE])
+                translations.extend(
+                    engine.translate_batch(batch, target_language)
+                )
+
+        after = PowerPointTranslator._copy_metrics(engine.metrics)
+        return _SlideTranslationPayload(
+            slide_number=job.slide_number,
+            translations=translations,
+            translated_notes=translated_notes,
+            metrics=PowerPointTranslator._metrics_delta(before, after),
+        )
+
+    def _translate_job_chunk(
+        self,
+        jobs: List[_SlideTranslationJob],
+        target_language: str,
+        on_payload=None,
+    ) -> List[_SlideTranslationPayload]:
+        engine = self._new_worker_engine()
+        payloads = []
+        for job in jobs:
+            payload = self._translate_job(engine, job, target_language)
+            payloads.append(payload)
+            if on_payload is not None:
+                on_payload(payload)
+        return payloads
+
+    def _should_parallelize_slides(self, slide_count: int) -> bool:
+        return (
+            self.slide_workers > 1
+            and slide_count > self.slides_per_worker
+        )
+
+    def _translate_prepared_slides(
+        self,
+        contexts: List[_SlideApplicationContext],
+        target_language: str,
+        progress_callback=None,
+    ) -> TranslationResult:
+        chunks = [
+            contexts[start:start + self.slides_per_worker]
+            for start in range(0, len(contexts), self.slides_per_worker)
+        ]
+        worker_count = min(self.slide_workers, len(chunks))
+        logger.info(
+            "⚡ Parallel slide translation: %s slides, %s workers, "
+            "%s slides per worker",
+            len(contexts),
+            worker_count,
+            self.slides_per_worker,
+        )
+
+        payloads: Dict[int, _SlideTranslationPayload] = {}
+        progress_lock = threading.Lock()
+
+        def _record_payload(payload: _SlideTranslationPayload) -> None:
+            with progress_lock:
+                payloads[payload.slide_number] = payload
+                self._merge_metrics(payload.metrics)
+                if progress_callback is not None:
+                    try:
+                        progress_callback(
+                            payload.slide_number,
+                            self.engine.metrics,
+                        )
+                    except Exception as cb_err:
+                        logger.debug(
+                            "progress_callback failed: %s",
+                            cb_err,
+                        )
+
+        with ThreadPoolExecutor(
+            max_workers=worker_count,
+            thread_name_prefix="slide-translator",
+        ) as executor:
+            futures = {
+                executor.submit(
+                    self._translate_job_chunk,
+                    [context.job for context in chunk],
+                    target_language,
+                    _record_payload,
+                ): chunk
+                for chunk in chunks
+            }
+            try:
+                for future in as_completed(futures):
+                    future.result()
+            except Exception:
+                for future in futures:
+                    future.cancel()
+                raise
+
+        result = TranslationResult()
+        for context in contexts:
+            payload = payloads[context.job.slide_number]
+            translated_count, notes_translated = (
+                self.strategy.apply_translated_slide(
+                    context.slide,
+                    context.text_items,
+                    payload.translations,
+                    context.job.notes_text,
+                    payload.translated_notes,
+                    target_language,
+                )
+            )
+            result.translated_count += translated_count
+            if notes_translated:
+                result.translated_notes_count += 1
+            result.total_shapes += context.shape_count
+
+        return result
+
     def translate_presentation(self, input_file: str, output_file: str, target_language: str,
                                progress_callback=None) -> TranslationResult:
         """Translate entire PowerPoint presentation.
@@ -1149,24 +1422,35 @@ class PowerPointTranslator:
 
             self._maybe_detect_source_language(prs)
 
-            for slide_idx, slide in enumerate(prs.slides):
-                logger.debug(f"📄 Processing slide {slide_idx + 1}/{total_slides}")
-
-                translated_count, notes_translated = self.strategy.translate_slide(
-                    slide, target_language, translate_charts=self.translate_charts,
+            if self._should_parallelize_slides(total_slides):
+                contexts = [
+                    self._prepare_slide_context(slide_idx, slide)
+                    for slide_idx, slide in enumerate(prs.slides, 1)
+                ]
+                result = self._translate_prepared_slides(
+                    contexts,
+                    target_language,
+                    progress_callback,
                 )
+            else:
+                for slide_idx, slide in enumerate(prs.slides):
+                    logger.debug(f"📄 Processing slide {slide_idx + 1}/{total_slides}")
 
-                result.translated_count += translated_count
-                if notes_translated:
-                    result.translated_notes_count += 1
-                result.total_shapes += len(slide.shapes)
+                    translated_count, notes_translated = self.strategy.translate_slide(
+                        slide, target_language, translate_charts=self.translate_charts,
+                    )
 
-                logger.debug(f"✅ Slide {slide_idx + 1}: {translated_count} texts translated")
-                if progress_callback is not None:
-                    try:
-                        progress_callback(slide_idx + 1, self.engine.metrics)
-                    except Exception as cb_err:
-                        logger.debug(f"progress_callback failed: {cb_err}")
+                    result.translated_count += translated_count
+                    if notes_translated:
+                        result.translated_notes_count += 1
+                    result.total_shapes += len(slide.shapes)
+
+                    logger.debug(f"✅ Slide {slide_idx + 1}: {translated_count} texts translated")
+                    if progress_callback is not None:
+                        try:
+                            progress_callback(slide_idx + 1, self.engine.metrics)
+                        except Exception as cb_err:
+                            logger.debug(f"progress_callback failed: {cb_err}")
 
             prs.save(output_file)
 
@@ -1206,27 +1490,41 @@ class PowerPointTranslator:
 
             self._maybe_detect_source_language(prs)
 
-            for processed_idx, slide_num in enumerate(slide_numbers, 1):
-                slide_idx = slide_num - 1
-                slide = prs.slides[slide_idx]
-
-                logger.debug(f"📄 Processing slide {slide_num}/{total_slides}")
-
-                translated_count, notes_translated = self.strategy.translate_slide(
-                    slide, target_language, translate_charts=self.translate_charts,
+            if self._should_parallelize_slides(len(slide_numbers)):
+                contexts = [
+                    self._prepare_slide_context(
+                        slide_num,
+                        prs.slides[slide_num - 1],
+                    )
+                    for slide_num in slide_numbers
+                ]
+                result = self._translate_prepared_slides(
+                    contexts,
+                    target_language,
+                    progress_callback,
                 )
+            else:
+                for processed_idx, slide_num in enumerate(slide_numbers, 1):
+                    slide_idx = slide_num - 1
+                    slide = prs.slides[slide_idx]
 
-                result.translated_count += translated_count
-                if notes_translated:
-                    result.translated_notes_count += 1
-                result.total_shapes += len(slide.shapes)
+                    logger.debug(f"📄 Processing slide {slide_num}/{total_slides}")
 
-                logger.debug(f"✅ Slide {slide_num}: {translated_count} texts translated")
-                if progress_callback is not None:
-                    try:
-                        progress_callback(processed_idx, self.engine.metrics)
-                    except Exception as cb_err:
-                        logger.debug(f"progress_callback failed: {cb_err}")
+                    translated_count, notes_translated = self.strategy.translate_slide(
+                        slide, target_language, translate_charts=self.translate_charts,
+                    )
+
+                    result.translated_count += translated_count
+                    if notes_translated:
+                        result.translated_notes_count += 1
+                    result.total_shapes += len(slide.shapes)
+
+                    logger.debug(f"✅ Slide {slide_num}: {translated_count} texts translated")
+                    if progress_callback is not None:
+                        try:
+                            progress_callback(processed_idx, self.engine.metrics)
+                        except Exception as cb_err:
+                            logger.debug(f"progress_callback failed: {cb_err}")
 
             prs.save(output_file)
 

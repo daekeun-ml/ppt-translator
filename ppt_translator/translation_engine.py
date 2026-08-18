@@ -1,11 +1,9 @@
-"""
-Core translation engine using AWS Bedrock
-"""
+"""Core translation engine using Amazon Bedrock Mantle."""
 import logging
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from .config import Config
-from .bedrock_client import BedrockClient
+from .bedrock_client import BedrockAuthenticationError, BedrockClient
 from .prompts import PromptGenerator
 from .text_utils import TextProcessor, SlideTextCollector
 from .cache import TranslationCache, NullCache, make_cache_key
@@ -25,7 +23,7 @@ class TranslationMetrics:
 
 
 class TranslationEngine:
-    """Core translation engine using AWS Bedrock"""
+    """Core translation engine using Amazon Bedrock Mantle."""
 
     _config_logged = False  # class-level flag so parallel workers don't spam logs
 
@@ -33,7 +31,13 @@ class TranslationEngine:
                  enable_polishing: bool = Config.ENABLE_POLISHING,
                  cache: Optional[TranslationCache] = None,
                  glossary: Optional[Dict[str, str]] = None,
-                 source_language: Optional[str] = None):
+                 source_language: Optional[str] = None,
+                 log_initialization: bool = True):
+        if not Config.validate_model_id(model_id):
+            raise ValueError(
+                f"Unsupported Bedrock Mantle model '{model_id}'. "
+                f"Supported models: {', '.join(Config.SUPPORTED_MODELS)}"
+            )
         self.model_id = model_id
         self.enable_polishing = enable_polishing
         self.bedrock = BedrockClient()
@@ -49,16 +53,17 @@ class TranslationEngine:
         self.metrics = TranslationMetrics()
 
         # Log configuration once per process, not per engine instance.
-        if not TranslationEngine._config_logged:
+        if log_initialization and not TranslationEngine._config_logged:
             self._log_configuration()
             TranslationEngine._config_logged = True
-        logger.info(f"🎨 Translation mode: {'Natural/Polished' if enable_polishing else 'Literal'}")
+        if log_initialization:
+            logger.info(f"🎨 Translation mode: {'Natural/Polished' if enable_polishing else 'Literal'}")
         
     def _log_configuration(self):
         """Log current configuration settings"""
         logger.info("⚙️ Configuration Settings:")
         logger.info(f"  AWS Region: {Config.AWS_REGION}")
-        logger.info(f"  AWS Profile: {Config.AWS_PROFILE}")
+        logger.info("  Endpoint: Amazon Bedrock Mantle")
         logger.info(f"  Default Language: {Config.DEFAULT_TARGET_LANGUAGE}")
         logger.info(f"  Model ID: {Config.DEFAULT_MODEL_ID}")
         logger.info(f"  Max Tokens: {Config.MAX_TOKENS}")
@@ -150,6 +155,9 @@ class TranslationEngine:
             logger.debug(f"Translated: '{text[:50]}...' -> '{translated_text[:50]}...'")
             return translated_text
 
+        except BedrockAuthenticationError as e:
+            logger.error(f"Translation authentication error: {str(e)}")
+            raise
         except Exception as e:
             logger.error(f"Translation error: {str(e)}")
             return text
@@ -248,6 +256,9 @@ class TranslationEngine:
             logger.info(f"✅ Batch translation completed: {len(uncached_texts)} translated, {len(cached_at)} from cache")
             return results
 
+        except BedrockAuthenticationError as e:
+            logger.error(f"❌ Batch translation authentication error: {str(e)}")
+            raise
         except Exception as e:
             logger.error(f"❌ Batch translation error: {str(e)}")
             return self._fallback_individual_translation(texts, target_language)
@@ -262,6 +273,8 @@ class TranslationEngine:
                 translated = self.translate_text(text, target_language)
                 results.append(translated)
                 logger.debug(f"✅ Individual translation {i+1}/{len(texts)}")
+            except BedrockAuthenticationError:
+                raise
             except Exception as e:
                 logger.error(f"❌ Failed to translate text {i+1}: {str(e)}")
                 results.append(text)
